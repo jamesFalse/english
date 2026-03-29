@@ -204,4 +204,56 @@ export const wordRouter = createTRPCRouter({
         },
       });
     }),
+
+  submitBatchReview: publicProcedure
+    .input(
+      z.array(
+        z.object({
+          wordId: z.number(),
+          rating: z.nativeEnum(Rating),
+        })
+      )
+    )
+    .mutation(async ({ ctx, input }) => {
+      const f = fsrs();
+      const now = new Date();
+
+      return ctx.db.$transaction(async (tx) => {
+        const results = [];
+        for (const { wordId, rating } of input) {
+          const word = await tx.word.findUnique({ where: { id: wordId } });
+          if (!word) continue;
+
+          const card = createEmptyCard();
+          card.due = word.due ?? now;
+          card.stability = word.stability;
+          card.difficulty = word.difficulty;
+          card.scheduled_days = word.scheduled_days;
+          card.reps = word.reps;
+          card.lapses = word.lapses;
+          card.state = word.state;
+          card.last_review = word.last_review ?? undefined;
+
+          const schedulingCards = f.repeat(card, now);
+          const { card: updatedCard } = schedulingCards[rating as Grade]!;
+
+          const updated = await tx.word.update({
+            where: { id: wordId },
+            data: {
+              due: updatedCard.due,
+              stability: updatedCard.stability,
+              difficulty: updatedCard.difficulty,
+              elapsed_days: updatedCard.elapsed_days,
+              scheduled_days: updatedCard.scheduled_days,
+              reps: updatedCard.reps,
+              lapses: updatedCard.lapses,
+              state: updatedCard.state,
+              last_review: updatedCard.last_review,
+            },
+          });
+          results.push(updated);
+        }
+        return results;
+      });
+    }),
 });
