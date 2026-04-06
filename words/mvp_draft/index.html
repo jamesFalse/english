@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI English Reader | B1 Level Storyteller</title>
+    <script src="https://unpkg.com/compromise"></script>
+    <style>
+        :root {
+            --bg-color: #fcfaf7;
+            --text-color: #2c3e50;
+            --accent-color: #e67e22;
+            --border-color: #dcdde1;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.8;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        h1 {
+            font-weight: 400;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: var(--text-color);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        .api-key-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="password"] {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: sans-serif;
+        }
+
+        button {
+            background-color: var(--text-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #34495e;
+        }
+
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .word-panel {
+            background: #fff;
+            border-left: 4px solid var(--accent-color);
+            padding: 15px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+        }
+
+        .word-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-family: sans-serif;
+            font-size: 0.9rem;
+        }
+
+        .word-chip {
+            background: #f1f2f6;
+            padding: 2px 10px;
+            border-radius: 20px;
+            border: 1px solid #dfe4ea;
+        }
+
+        .word-chip span {
+            font-weight: bold;
+            font-size: 0.7rem;
+            color: var(--accent-color);
+            margin-left: 4px;
+        }
+
+        #story-container {
+            background: white;
+            padding: 40px 60px;
+            border-radius: 2px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+            min-height: 400px;
+            position: relative;
+        }
+
+        .story-content {
+            font-size: 1.2rem;
+            white-space: pre-wrap;
+        }
+
+        .story-content b {
+            color: var(--accent-color);
+            text-decoration: underline;
+        }
+
+        #status {
+            text-align: center;
+            font-style: italic;
+            margin-top: 20px;
+            color: #7f8c8d;
+        }
+
+        .loading-spinner {
+            display: none;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 600px) {
+            #story-container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>StoryWeaver</h1>
+            <p>AI-Powered English Reading for B1 Learners</p>
+        </header>
+
+        <div class="controls">
+            <div class="api-key-group">
+                <input type="password" id="api-key" placeholder="Enter your Gemini API Key">
+                <button id="generate-btn">Generate New Story</button>
+            </div>
+            <div id="status">Ready to weave a story...</div>
+            <div class="loading-spinner" id="spinner"></div>
+        </div>
+
+        <div class="word-panel" id="word-panel" style="display: none;">
+            <strong>Target Vocabulary (30 words):</strong>
+            <div class="word-list" id="target-words"></div>
+        </div>
+
+        <div id="story-container">
+            <div class="story-content" id="story-text">
+                The story will appear here. Please enter your API key and click generate.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STOP_WORDS = new Set(["i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself", "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this", "that", "these", "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now"]);
+
+        let oxfordData = [];
+        let masterWordSet = new Set();
+
+        async function loadData() {
+            try {
+                const response = await fetch('oxford_5000_filtered.json');
+                oxfordData = await response.json();
+                oxfordData.forEach(item => masterWordSet.add(item.word.toLowerCase()));
+                console.log("Data loaded:", oxfordData.length, "words");
+            } catch (e) {
+                document.getElementById('status').innerText = "Error loading vocabulary data.";
+            }
+        }
+
+        function sampleWords() {
+            const groupA = oxfordData.filter(w => ['B1', 'B2'].includes(w.cefr.toUpperCase()));
+            const groupB = oxfordData.filter(w => ['C1', 'C2'].includes(w.cefr.toUpperCase()) || !['A1', 'A2', 'B1', 'B2'].includes(w.cefr.toUpperCase()));
+
+            const shuffle = (array) => array.sort(() => 0.5 - Math.random());
+
+            const selectedA = shuffle(groupA).slice(0, 18);
+            const selectedB = shuffle(groupB).slice(0, 12);
+
+            return [...selectedA, ...selectedB];
+        }
+
+        function validateStory(text) {
+            // Use compromise to lemmatize words
+            const doc = nlp(text);
+            const terms = doc.terms().json();
+
+            let unknownCount = 0;
+            const unknownWords = [];
+
+            terms.forEach(term => {
+                const word = term.text.toLowerCase().replace(/[^a-z]/g, '');
+                const lemma = term.terms[0].root || term.terms[0].normal;
+
+                if (word.length < 2) return;
+                if (STOP_WORDS.has(word) || STOP_WORDS.has(lemma)) return;
+
+                // Basic check for proper nouns (capitalized in middle of sentence usually)
+                if (term.terms[0].tags.includes('ProperNoun')) return;
+
+                if (!masterWordSet.has(word) && !masterWordSet.has(lemma)) {
+                    unknownCount++;
+                    unknownWords.push(word);
+                }
+            });
+
+            console.log("Unknown words found:", unknownCount, unknownWords);
+            return unknownCount <= 3;
+        }
+
+        async function generateStory(apiKey, retryCount = 0) {
+            const btn = document.getElementById('generate-btn');
+            const status = document.getElementById('status');
+            const spinner = document.getElementById('spinner');
+            const targetList = document.getElementById('target-words');
+            const wordPanel = document.getElementById('word-panel');
+            const storyText = document.getElementById('story-text');
+
+            btn.disabled = true;
+            spinner.style.display = 'block';
+            status.innerText = retryCount > 0 ? "Retrying generation (failed validation)..." : "Composing story...";
+
+            const selectedWords = sampleWords();
+            wordPanel.style.display = 'block';
+            targetList.innerHTML = selectedWords.map(w => `<div class="word-chip">${w.word}<span>${w.cefr}</span></div>`).join('');
+
+            const wordString = selectedWords.map(w => w.word).join(', ');
+
+            const prompt = `Write a creative English short story suitable for B1 level learners. 
+        Length: 500 to 600 words.
+        Constraint: You MUST use all the following 30 words in the story: [${wordString}].
+        Formatting: You MUST **bold** these 30 words every time they appear in the text.
+        Structure: Use simple but engaging narrative structures appropriate for B1 level.`;
+
+            const GEMINI_API_KEY = apiKey; // Replace with your actual API key
+            const model = 'gemini-2.5-flash';
+            const endpoint = `https://generativelanguage.googleapis.com/${model}:generateContent?key=${GEMINI_API_KEY}`;
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+
+                let generatedText = data.candidates[0].content.parts[0].text;
+
+                // Post-generation validation
+                if (validateStory(generatedText) || retryCount >= 1) {
+                    storyText.innerHTML = generatedText.replace(/\n/g, '<br>');
+                    status.innerText = retryCount > 0 ? "Generated (Validation bypassed after retry)" : "Story complete!";
+                } else {
+                    console.log("Validation failed, retrying...");
+                    return generateStory(apiKey, retryCount + 1);
+                }
+
+            } catch (e) {
+                status.innerText = "Error: " + e.message;
+                console.error(e);
+            } finally {
+                if (retryCount === 0 || status.innerText.includes("complete") || status.innerText.includes("Error")) {
+                    btn.disabled = false;
+                    spinner.style.display = 'none';
+                }
+            }
+        }
+
+        document.getElementById('generate-btn').addEventListener('click', () => {
+            const apiKey = document.getElementById('api-key').value.trim();
+            if (!apiKey) {
+                alert("Please enter a Gemini API Key.");
+                return;
+            }
+            generateStory(apiKey);
+        });
+
+        loadData();
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+env/
+lib/
+lib64/
+bin/
+include/
+share/
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Build and Output
+.next/
+out/
+build/
+dist/
+target/
+*.so
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+prisma/migrations/
+# Note: Keeping schema.prisma is good, but generated client should be ignored if not in a custom path
+# Since words/project/generated/prisma exists, I'll add it
+generated/
+
+# Environment Variables and Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+secrets.json
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Project specific
+analyze/venv/
+correction/venv/
+words/project/node_modules/
+words/project/.next/
