@@ -1,14 +1,13 @@
 # English Learning Tools Workspace
 
-This workspace contains a collection of AI-powered tools designed to assist in English language learning, ranging from sentence structure analysis to vocabulary building and grammar correction.
+This workspace contains a collection of AI-powered tools designed to assist in English language learning, ranging from sentence structure analysis to vocabulary building.
 
 ## Project Overview
 
-The workspace is organized into three main independent sub-projects:
+The workspace is organized into two main active sub-projects:
 
 1.  **Analyze (`/analyze`)**: An English Logic Flow Analyzer that helps users understand the "native speaker reading logic" of complex sentences.
-2.  **Correction (`/correction`)**: A hybrid grammar checker (Linguist-Mix) combining local rule-based engines (LanguageTool) with deep AI analysis (Gemini).
-3.  **Words (`/words/project`)**: A full-stack vocabulary learning application using the T3 Stack, featuring FSRS spaced repetition and AI-generated context stories.
+2.  **Words (`/words/project`)**: A full-stack vocabulary learning application using the T3 Stack, featuring FSRS spaced repetition and AI-generated context stories. (Imported with full commit history)
 
 ---
 
@@ -27,22 +26,7 @@ Focuses on deconstructing long and difficult sentences into logical "chunks" to 
     -   Access via: `http://127.0.0.1:5001`
 -   **Configuration**: Requires a Gemini API key in `app.py`.
 
-## 2. Grammar Corrector - Linguist-Mix (`/correction`)
-
-A lightweight, privacy-conscious grammar correction tool with two modes.
-
--   **Tech Stack**: Python (Flask), `language-tool-python`, Gemini API, Vanilla JS, Tailwind CSS.
--   **Key Features**:
-    -   **Local Mode**: Fast, offline check using LanguageTool.
-    -   **AI Mode**: Deep, intelligent correction using Gemini.
-    -   Real-time highlighting of errors with suggested replacements.
--   **Running**:
-    -   Navigate to `/correction`.
-    -   Run `start.bat` (calls `run.py`).
-    -   Access via: `http://127.0.0.1:5000`
--   **Configuration**: Requires Gemini API setup for AI mode.
-
-## 3. Vocabulary Builder (`/words/project`)
+## 2. Vocabulary Builder (`/words/project`)
 
 An advanced flashcard and story generation app for mastering English vocabulary.
 
@@ -74,7 +58,6 @@ An advanced flashcard and story generation app for mastering English vocabulary.
 ```text
 .
 ├── analyze/          # Flask app for sentence logic analysis
-├── correction/       # Flask app for grammar correction
 ├── words/
 │   ├── mvp_draft/    # Early prototypes and scripts
 │   └── project/      # Main Next.js vocabulary application
