@@ -162,11 +162,20 @@ export const wordRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const f = fsrs();
       const now = new Date();
+      const wordIds = input.map((i) => i.wordId);
 
       return ctx.db.$transaction(async (tx) => {
-        const results = [];
+        // 1. 一次性获取所有相关的单词数据，减少数据库往返
+        const words = await tx.word.findMany({
+          where: { id: { in: wordIds } },
+        });
+
+        const wordMap = new Map(words.map((w) => [w.id, w]));
+        const updatePromises = [];
+
+        // 2. 循环处理评分并准备更新
         for (const { wordId, rating } of input) {
-          const word = await tx.word.findUnique({ where: { id: wordId } });
+          const word = wordMap.get(wordId);
           if (!word) continue;
 
           const card = createEmptyCard();
@@ -182,23 +191,29 @@ export const wordRouter = createTRPCRouter({
           const schedulingCards = f.repeat(card, now);
           const { card: updatedCard } = schedulingCards[rating as Grade]!;
 
-          const updated = await tx.word.update({
-            where: { id: wordId },
-            data: {
-              due: updatedCard.due,
-              stability: updatedCard.stability,
-              difficulty: updatedCard.difficulty,
-              elapsed_days: updatedCard.elapsed_days,
-              scheduled_days: updatedCard.scheduled_days,
-              reps: updatedCard.reps,
-              lapses: updatedCard.lapses,
-              state: updatedCard.state,
-              last_review: updatedCard.last_review,
-            },
-          });
-          results.push(updated);
+          // 将更新操作加入队列
+          updatePromises.push(
+            tx.word.update({
+              where: { id: wordId },
+              data: {
+                due: updatedCard.due,
+                stability: updatedCard.stability,
+                difficulty: updatedCard.difficulty,
+                elapsed_days: updatedCard.elapsed_days,
+                scheduled_days: updatedCard.scheduled_days,
+                reps: updatedCard.reps,
+                lapses: updatedCard.lapses,
+                state: updatedCard.state,
+                last_review: updatedCard.last_review,
+              },
+            })
+          );
         }
-        return results;
+
+        // 3. 并行执行所有更新
+        return Promise.all(updatePromises);
+      }, {
+        timeout: 30000, // 将事务超时时间增加到 30 秒，防止默认的 5 秒限制
       });
     }),
 });
