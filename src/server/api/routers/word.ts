@@ -108,20 +108,28 @@ export const wordRouter = createTRPCRouter({
       z.object({
         words: z.array(z.string()),
         difficulty: z.string(), 
+        theme: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
-      const { words, difficulty } = input;
+      const { words, difficulty, theme } = input;
       const wordCount = words.length;
       const targetLength = Math.max(80, wordCount * 15);
 
+      const themeContext = theme && theme !== "General" 
+        ? `The story should be set in or related to: **${theme}**. 
+           If a word doesn't naturally fit this theme, use a creative metaphor or a brief sub-plot to integrate it smoothly. 
+           Priority 1 is natural narrative flow.` 
+        : "The story can be about any engaging topic.";
+
       const prompt = `
         Create a level ${difficulty} story (approx. ${targetLength} words).
+        THEME/SETTING: ${themeContext}
         TARGET WORDS: ${words.join(", ")}.
         
         TASK:
         - Weave these words into a natural story using strong COLLOCATIONS.
-        - Wrap the FULL CHUNK in <u> tags.
+        - Wrap the FULL LEXICAL CHUNK in <u> tags.
         - Wrap the TARGET WORD in <mark data-word="original_word"> tags (inside the <u> tags).
         - IMPORTANT: 'data-word' MUST match the exact spelling from the TARGET WORDS list.
         - No Markdown formatting.

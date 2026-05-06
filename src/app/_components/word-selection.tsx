@@ -27,6 +27,7 @@ export function WordSelection() {
   const [quotas, setQuotas] = useState({ basic: 30, independent: 60, proficient: 10, limit: 30, reviewRatio: 70 });
   const [words, setWords] = useState<any[]>([]);
   const [difficulty, setDifficulty] = useState("B1");
+  const [theme, setTheme] = useState("General");
   const [story, setStory] = useState("");
 
   // New States for Batching and Undo
@@ -79,6 +80,7 @@ export function WordSelection() {
     const savedSyncedIds = localStorage.getItem("syncedIds");
     const savedStory = localStorage.getItem("currentStory");
     const savedQuotas = localStorage.getItem("wordQuotas");
+    const savedTheme = localStorage.getItem("currentTheme");
 
     if (savedRatings) {
       try { setPendingRatings(JSON.parse(savedRatings)); } catch (e) { console.error(e); }
@@ -100,7 +102,14 @@ export function WordSelection() {
         setQuotas(parsed); 
       } catch (e) { console.error(e); }
     }
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("currentTheme", theme);
+  }, [theme]);
 
   // Sync states to localStorage
   useEffect(() => {
@@ -162,6 +171,7 @@ export function WordSelection() {
     generateStoryMutation.mutate({
       words: unratedWords.map((w) => w.text),
       difficulty,
+      theme,
     });
   };
 
@@ -470,33 +480,48 @@ export function WordSelection() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-5 space-y-6">
-              <div className="flex flex-wrap items-end gap-4 bg-muted/20 p-4 rounded-lg border border-muted/50">
-                <div className="space-y-1.5 flex-1 min-w-[180px]">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Target Story Level</label>
-                  <Select value={difficulty} onValueChange={(val) => val && setDifficulty(val)}>
-                    <SelectTrigger className="h-9 bg-background shadow-sm border-muted-foreground/20">
-                      <SelectValue placeholder="Select difficulty" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {["A1", "A2", "B1", "B2", "C1", "C2"].map((level) => (
-                        <SelectItem key={level} value={level}>
-                          {level} - {level.startsWith("A") ? "Basic" : level.startsWith("B") ? "Intermediate" : "Advanced"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="flex flex-col gap-4 bg-muted/20 p-4 rounded-lg border border-muted/50">
+                <div className="grid grid-cols-2 gap-4 w-full">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Story Level</label>
+                    <Select value={difficulty} onValueChange={(val) => val && setDifficulty(val)}>
+                      <SelectTrigger className="h-9 bg-background shadow-sm border-muted-foreground/20">
+                        <SelectValue placeholder="Select difficulty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["A1", "A2", "B1", "B2", "C1", "C2"].map((level) => (
+                          <SelectItem key={level} value={level}>
+                            {level} - {level.startsWith("A") ? "Basic" : level.startsWith("B") ? "Intermediate" : "Advanced"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Story Theme</label>
+                    <Select value={theme} onValueChange={(val) => val && setTheme(val)}>
+                      <SelectTrigger className="h-9 bg-background shadow-sm border-muted-foreground/20">
+                        <SelectValue placeholder="Select theme" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["General", "Work & Career", "Daily Life", "Travel", "Science & Tech", "Mystery & Story"].map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <Button
                   onClick={handleGenerateStory}
                   disabled={generateStoryMutation.isPending || unratedWords.length === 0}
-                  className="bg-primary hover:bg-primary/90 h-9 px-5 font-bold shadow-sm"
+                  className="bg-primary hover:bg-primary/90 h-10 w-full font-bold shadow-sm"
                 >
                   {generateStoryMutation.isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <BookOpen className="mr-2 h-4 w-4" />
                   )}
-                  {unratedWords.length > 0 ? `Generate Story (${unratedWords.length} words)` : "All Reviewed"}
+                  {unratedWords.length > 0 ? `Generate ${theme} Story (${unratedWords.length} words)` : "All Reviewed"}
                 </Button>
               </div>
 
