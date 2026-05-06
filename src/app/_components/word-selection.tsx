@@ -24,7 +24,7 @@ const ratingLabels: Record<number, string> = {
 };
 
 export function WordSelection() {
-  const [quotas, setQuotas] = useState({ basic: 30, independent: 60, proficient: 10 });
+  const [quotas, setQuotas] = useState({ basic: 30, independent: 60, proficient: 10, limit: 30, reviewRatio: 70 });
   const [words, setWords] = useState<any[]>([]);
   const [difficulty, setDifficulty] = useState("B1");
   const [story, setStory] = useState("");
@@ -32,6 +32,9 @@ export function WordSelection() {
   // New States for Batching and Undo
   const [pendingRatings, setPendingRatings] = useState<Record<number, Rating>>({});
   const [syncedIds, setSyncedIds] = useState<Set<number>>(new Set());
+
+  // Floating UI State
+  const [floatingMenu, setFloatingMenu] = useState<{ x: number, y: number, wordId: number } | null>(null);
 
   const utils = api.useUtils();
   const generateQuery = api.word.generateSelection.useQuery(
@@ -75,6 +78,7 @@ export function WordSelection() {
     const savedWords = localStorage.getItem("currentWords");
     const savedSyncedIds = localStorage.getItem("syncedIds");
     const savedStory = localStorage.getItem("currentStory");
+    const savedQuotas = localStorage.getItem("wordQuotas");
 
     if (savedRatings) {
       try { setPendingRatings(JSON.parse(savedRatings)); } catch (e) { console.error(e); }
@@ -88,9 +92,21 @@ export function WordSelection() {
     if (savedStory) {
       setStory(savedStory);
     }
+    if (savedQuotas) {
+      try { 
+        const parsed = JSON.parse(savedQuotas);
+        // Migration: Ensure reviewRatio exists
+        if (parsed.reviewRatio === undefined) parsed.reviewRatio = 70;
+        setQuotas(parsed); 
+      } catch (e) { console.error(e); }
+    }
   }, []);
 
   // Sync states to localStorage
+  useEffect(() => {
+    localStorage.setItem("wordQuotas", JSON.stringify(quotas));
+  }, [quotas]);
+
   useEffect(() => {
     if (Object.keys(pendingRatings).length > 0) {
       localStorage.setItem("pendingRatings", JSON.stringify(pendingRatings));
@@ -153,6 +169,29 @@ export function WordSelection() {
     if (syncedIds.has(wordId)) return;
 
     setPendingRatings((prev) => ({ ...prev, [wordId]: rating }));
+    setFloatingMenu(null);
+  };
+
+  const handleStoryClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const mark = target.closest("mark");
+    
+    if (mark) {
+      const baseWord = mark.getAttribute("data-word");
+      if (baseWord) {
+        const wordMatch = words.find(w => w.text.toLowerCase() === baseWord.toLowerCase());
+        if (wordMatch && !syncedIds.has(wordMatch.id)) {
+          setFloatingMenu({
+            x: e.clientX,
+            y: e.clientY,
+            wordId: wordMatch.id
+          });
+          playTTS(wordMatch.text);
+          return;
+        }
+      }
+    }
+    setFloatingMenu(null);
   };
 
   const handleBatchSubmit = async () => {
@@ -191,44 +230,79 @@ export function WordSelection() {
   const allSynced = words.length > 0 && syncedIds.size === words.length;
   const hasPending = Object.keys(pendingRatings).length > 0;
 
+  // Process story to add data-rated attributes
+  const processedStory = () => {
+    if (!story) return "";
+    let html = story.replace(/\n/g, "<br />");
+    words.forEach(word => {
+      const isRated = syncedIds.has(word.id) || pendingRatings[word.id] !== undefined;
+      if (isRated) {
+        // Find <mark data-word="word"> and add data-rated="true"
+        const regex = new RegExp(`<mark data-word="${word.text}"`, "gi");
+        html = html.replace(regex, `<mark data-word="${word.text}" data-rated="true"`);
+      }
+    });
+    return html;
+  };
+
   return (
-    <div className="w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-8 overflow-hidden items-start">
+    <div className="w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-8 overflow-hidden items-start" onClick={() => floatingMenu && setFloatingMenu(null)}>
       {/* Left Column: Word Selection & List */}
       <div className="h-full overflow-y-auto pr-2 space-y-8 pb-8">
         <Card className="shadow-md border-2 border-muted/50 pt-0">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-bold">Word Selection Quotas (%)</CardTitle>
+            <CardTitle className="text-xl font-bold">Word Selection Config</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="quota-basic" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Basic (A1/A2)</label>
+            <div className="grid grid-cols-5 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor="quota-basic" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Basic</label>
                 <Input
                   id="quota-basic"
                   type="number"
                   value={quotas.basic}
                   onChange={(e) => setQuotas({ ...quotas, basic: Number(e.target.value) })}
-                  className="h-10 font-semibold"
+                  className="h-9 font-semibold px-2"
                 />
               </div>
-              <div className="space-y-2">
-                <label htmlFor="quota-independent" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Independent (B1/B2)</label>
+              <div className="space-y-1.5">
+                <label htmlFor="quota-independent" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Indep.</label>
                 <Input
                   id="quota-independent"
                   type="number"
                   value={quotas.independent}
                   onChange={(e) => setQuotas({ ...quotas, independent: Number(e.target.value) })}
-                  className="h-10 font-semibold"
+                  className="h-9 font-semibold px-2"
                 />
               </div>
-              <div className="space-y-2">
-                <label htmlFor="quota-proficient" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Proficient (C1/C2)</label>
+              <div className="space-y-1.5">
+                <label htmlFor="quota-proficient" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Profic.</label>
                 <Input
                   id="quota-proficient"
                   type="number"
                   value={quotas.proficient}
                   onChange={(e) => setQuotas({ ...quotas, proficient: Number(e.target.value) })}
-                  className="h-10 font-semibold"
+                  className="h-9 font-semibold px-2"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="review-ratio" className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Review %</label>
+                <Input
+                  id="review-ratio"
+                  type="number"
+                  value={quotas.reviewRatio}
+                  onChange={(e) => setQuotas({ ...quotas, reviewRatio: Number(e.target.value) })}
+                  className="h-9 font-bold border-orange-200 focus-visible:ring-orange-500 px-2"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="selection-limit" className="text-[10px] font-bold text-primary uppercase tracking-wider">Count</label>
+                <Input
+                  id="selection-limit"
+                  type="number"
+                  value={quotas.limit}
+                  onChange={(e) => setQuotas({ ...quotas, limit: Number(e.target.value) })}
+                  className="h-9 font-bold border-primary/50 px-2"
                 />
               </div>
             </div>
@@ -266,7 +340,7 @@ export function WordSelection() {
                   ) : (
                     <CheckCircle2 className="mr-2 h-5 w-5" />
                   )}
-                  Generate 30 Practice Words
+                  Generate {quotas.limit} Practice Words
                 </Button>
               )}
             </div>
@@ -373,7 +447,20 @@ export function WordSelection() {
       </div>
 
       {/* Right Column: Story Generation */}
-      <div className="h-full overflow-y-auto pr-4 pb-8">
+      <div className="h-full overflow-y-auto pr-4 pb-8 relative">
+        {floatingMenu && (
+          <div 
+            className="fixed z-[100] bg-popover border shadow-2xl rounded-xl p-2 grid grid-cols-4 gap-1 animate-in fade-in zoom-in duration-200"
+            style={{ left: floatingMenu.x - 80, top: floatingMenu.y - 60 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-red-600 hover:bg-red-50" onClick={() => handleReview(floatingMenu.wordId, Rating.Again)}>Again</Button>
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-orange-600 hover:bg-orange-50" onClick={() => handleReview(floatingMenu.wordId, Rating.Hard)}>Hard</Button>
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-green-600 hover:bg-green-50" onClick={() => handleReview(floatingMenu.wordId, Rating.Good)}>Good</Button>
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-blue-600 hover:bg-blue-50" onClick={() => handleReview(floatingMenu.wordId, Rating.Easy)}>Easy</Button>
+          </div>
+        )}
+
         {words.length > 0 ? (
           <Card className="shadow-sm border-2 border-muted overflow-visible pt-0">
             <CardHeader className="bg-muted/50 border-b py-4">
@@ -414,12 +501,15 @@ export function WordSelection() {
               </div>
 
               {story && (
-                <div className="mt-4 p-6 bg-background rounded-lg border border-muted shadow-sm prose prose-slate max-w-none overflow-visible">
+                <div 
+                  className="mt-4 p-6 bg-background rounded-lg border border-muted shadow-sm prose prose-slate max-w-none overflow-visible cursor-default select-none"
+                  onClick={handleStoryClick}
+                >
                   <div
                     dangerouslySetInnerHTML={{
-                      __html: story.replace(/\n/g, "<br />")
+                      __html: processedStory()
                     }}
-                    className="[&>mark]:bg-yellow-100 [&>mark]:text-yellow-900 [&>mark]:px-1 [&>mark]:py-0.5 [&>mark]:rounded [&>mark]:font-bold [&>mark]:border-b-2 [&>mark]:border-yellow-400/50 text-base md:text-lg leading-relaxed text-foreground font-sans"
+                    className="[&>mark]:bg-indigo-100/60 [&>mark]:text-indigo-900 [&>mark]:px-1 [&>mark]:py-0.5 [&>mark]:rounded [&>mark]:font-bold [&>mark]:border-b-2 [&>mark]:border-indigo-300/40 [&>mark]:transition-all [&>mark]:duration-300 [&>mark]:cursor-pointer hover:[&>mark]:bg-indigo-200/80 [&>mark[data-rated='true']]:opacity-40 [&>mark[data-rated='true']]:grayscale [&>mark[data-rated='true']]:cursor-default [&>u]:decoration-blue-400/50 [&>u]:decoration-dashed [&>u]:underline-offset-4 [&>u]:cursor-help text-base md:text-lg leading-relaxed text-foreground font-sans"
                   />
                 </div>
               )}

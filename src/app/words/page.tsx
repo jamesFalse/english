@@ -13,7 +13,9 @@ export default async function WordsPage() {
           <h1 className="text-2xl font-extrabold tracking-tight sm:text-4xl text-primary">
             AI Vocabulary <span className="text-blue-600">Learning</span>
           </h1>
-          <div className="w-20"></div> {/* Spacer */}
+          <Link href="/words/triage" className="text-xs font-bold px-3 py-1.5 bg-muted rounded-full hover:bg-muted/80 transition-colors">
+            Vocabulary Triage
+          </Link>
         </header>
         
         <div className="flex-1 overflow-hidden px-4 pb-6 w-full max-w-7xl mx-auto">
