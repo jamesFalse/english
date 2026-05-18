@@ -5,7 +5,7 @@ import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Volume2, Loader2, BookOpen, CheckCircle2, RotateCcw, Save } from "lucide-react";
+import { Volume2, Loader2, BookOpen, CheckCircle2, RotateCcw, Save, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Rating } from "ts-fsrs";
 
@@ -24,7 +24,8 @@ const ratingLabels: Record<number, string> = {
 };
 
 export function WordSelection() {
-  const [quotas, setQuotas] = useState({ basic: 30, independent: 60, proficient: 10, limit: 30, reviewRatio: 70 });
+  const [quotas, setQuotas] = useState({ reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 5 });
+  const [isConfigOpen, setIsConfigOpen] = useState(true);
   const [words, setWords] = useState<any[]>([]);
   const [difficulty, setDifficulty] = useState("B1");
   const [theme, setTheme] = useState("General");
@@ -97,9 +98,14 @@ export function WordSelection() {
     if (savedQuotas) {
       try { 
         const parsed = JSON.parse(savedQuotas);
-        // Migration: Ensure reviewRatio exists
-        if (parsed.reviewRatio === undefined) parsed.reviewRatio = 70;
-        setQuotas(parsed); 
+        const migrated = {
+          reviewCount: parsed.reviewCount ?? 20,
+          basicCount: parsed.basicCount ?? 10,
+          independentCount: parsed.independentCount ?? 10,
+          proficientCount: parsed.proficientCount ?? 5,
+        };
+        setQuotas(migrated);
+        setIsConfigOpen(false); 
       } catch (e) { console.error(e); }
     }
     if (savedTheme) {
@@ -145,6 +151,13 @@ export function WordSelection() {
   }, [story]);
 
   const handleGenerate = async () => {
+    const totalRequested = quotas.reviewCount + quotas.basicCount + quotas.independentCount + quotas.proficientCount;
+    if (totalRequested <= 0) {
+      alert("Please set at least one word count to greater than 0.");
+      setIsConfigOpen(true);
+      return;
+    }
+
     const { data } = await generateQuery.refetch();
     if (data) {
       setWords(data);
@@ -155,10 +168,10 @@ export function WordSelection() {
       localStorage.removeItem("currentWords");
       localStorage.removeItem("syncedIds");
       localStorage.removeItem("currentStory");
+      setIsConfigOpen(false); 
     }
   };
 
-  // Helper to handle potential type mismatch between string keys and number IDs
   const wordIdToNum = (id: any): number => {
     return typeof id === "string" ? parseInt(id) : id;
   };
@@ -240,14 +253,12 @@ export function WordSelection() {
   const allSynced = words.length > 0 && syncedIds.size === words.length;
   const hasPending = Object.keys(pendingRatings).length > 0;
 
-  // Process story to add data-rated attributes
   const processedStory = () => {
     if (!story) return "";
     let html = story.replace(/\n/g, "<br />");
     words.forEach(word => {
       const isRated = syncedIds.has(word.id) || pendingRatings[word.id] !== undefined;
       if (isRated) {
-        // Find <mark data-word="word"> and add data-rated="true"
         const regex = new RegExp(`<mark data-word="${word.text}"`, "gi");
         html = html.replace(regex, `<mark data-word="${word.text}" data-rated="true"`);
       }
@@ -257,105 +268,107 @@ export function WordSelection() {
 
   return (
     <div className="w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-8 overflow-hidden items-start" onClick={() => floatingMenu && setFloatingMenu(null)}>
-      {/* Left Column: Word Selection & List */}
-      <div className="h-full overflow-y-auto pr-2 space-y-8 pb-8">
-        <Card className="shadow-md border-2 border-muted/50 pt-0">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-bold">Word Selection Config</CardTitle>
+      <div className="h-full overflow-y-auto pr-2 space-y-6 pb-8">
+        <Card className="shadow-md border-2 border-muted/50 overflow-hidden">
+          <CardHeader 
+            className="pb-4 flex flex-row items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors py-3"
+            onClick={() => setIsConfigOpen(!isConfigOpen)}
+          >
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg font-bold">Word Selection Config</CardTitle>
+            </div>
+            {isConfigOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-5 gap-3">
-              <div className="space-y-1.5">
-                <label htmlFor="quota-basic" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Basic</label>
-                <Input
-                  id="quota-basic"
-                  type="number"
-                  value={quotas.basic}
-                  onChange={(e) => setQuotas({ ...quotas, basic: Number(e.target.value) })}
-                  className="h-9 font-semibold px-2"
-                />
+          
+          <div className={`transition-all duration-300 ease-in-out ${isConfigOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"}`}>
+            <CardContent className="pt-2 pb-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="quota-review" className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Review</label>
+                  <Input
+                    id="quota-review"
+                    type="number"
+                    value={quotas.reviewCount}
+                    onChange={(e) => setQuotas({ ...quotas, reviewCount: Number(e.target.value) })}
+                    className="h-9 font-bold border-orange-200 focus-visible:ring-orange-500 px-2"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="quota-basic" className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Basic (A1/2)</label>
+                  <Input
+                    id="quota-basic"
+                    type="number"
+                    value={quotas.basicCount}
+                    onChange={(e) => setQuotas({ ...quotas, basicCount: Number(e.target.value) })}
+                    className="h-9 font-bold border-green-200 focus-visible:ring-green-500 px-2"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="quota-independent" className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Indep. (B1/2)</label>
+                  <Input
+                    id="quota-independent"
+                    type="number"
+                    value={quotas.independentCount}
+                    onChange={(e) => setQuotas({ ...quotas, independentCount: Number(e.target.value) })}
+                    className="h-9 font-bold border-blue-200 focus-visible:ring-blue-500 px-2"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="quota-proficient" className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Profic. (C1/2)</label>
+                  <Input
+                    id="quota-proficient"
+                    type="number"
+                    value={quotas.proficientCount}
+                    onChange={(e) => setQuotas({ ...quotas, proficientCount: Number(e.target.value) })}
+                    className="h-9 font-bold border-purple-200 focus-visible:ring-purple-500 px-2"
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label htmlFor="quota-independent" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Indep.</label>
-                <Input
-                  id="quota-independent"
-                  type="number"
-                  value={quotas.independent}
-                  onChange={(e) => setQuotas({ ...quotas, independent: Number(e.target.value) })}
-                  className="h-9 font-semibold px-2"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="quota-proficient" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Profic.</label>
-                <Input
-                  id="quota-proficient"
-                  type="number"
-                  value={quotas.proficient}
-                  onChange={(e) => setQuotas({ ...quotas, proficient: Number(e.target.value) })}
-                  className="h-9 font-semibold px-2"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="review-ratio" className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Review %</label>
-                <Input
-                  id="review-ratio"
-                  type="number"
-                  value={quotas.reviewRatio}
-                  onChange={(e) => setQuotas({ ...quotas, reviewRatio: Number(e.target.value) })}
-                  className="h-9 font-bold border-orange-200 focus-visible:ring-orange-500 px-2"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="selection-limit" className="text-[10px] font-bold text-primary uppercase tracking-wider">Count</label>
-                <Input
-                  id="selection-limit"
-                  type="number"
-                  value={quotas.limit}
-                  onChange={(e) => setQuotas({ ...quotas, limit: Number(e.target.value) })}
-                  className="h-9 font-bold border-primary/50 px-2"
-                />
-              </div>
-            </div>
 
-            <div className="flex gap-4 mt-6">
-              {allSynced ? (
-                <Button
-                  className="w-full h-11 text-base font-bold shadow-sm bg-green-600 hover:bg-green-700"
-                  onClick={handleGenerate}
-                >
-                  <RotateCcw className="mr-2 h-5 w-5" />
-                  Start Next Story
-                </Button>
-              ) : hasPending ? (
-                <Button
-                  className="w-full h-11 text-base font-bold shadow-sm bg-blue-600 hover:bg-blue-700"
-                  onClick={handleBatchSubmit}
-                  disabled={submitBatchReviewMutation.isPending}
-                >
-                  {submitBatchReviewMutation.isPending ? (
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  ) : (
-                    <Save className="mr-2 h-5 w-5" />
-                  )}
-                  Sync Progress ({Object.keys(pendingRatings).length} words)
-                </Button>
-              ) : (
-                <Button
-                  className="w-full h-11 text-base font-bold shadow-sm"
-                  onClick={handleGenerate}
-                  disabled={generateQuery.isFetching}
-                >
-                  {generateQuery.isFetching ? (
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="mr-2 h-5 w-5" />
-                  )}
-                  Generate {quotas.limit} Practice Words
-                </Button>
-              )}
-            </div>
-          </CardContent>
+            </CardContent>
+          </div>
         </Card>
+
+        <div className="flex flex-col gap-4">
+          {!allSynced && !hasPending && (
+            <Button
+              className="w-full h-12 text-base font-bold shadow-md"
+              onClick={handleGenerate}
+              disabled={generateQuery.isFetching}
+            >
+              {generateQuery.isFetching ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <RotateCcw className="mr-2 h-5 w-5" />
+              )}
+              {words.length > 0 ? "Regenerate Word List" : "Generate Words to Start"}
+            </Button>
+          )}
+
+          {allSynced ? (
+            <Button
+              className="w-full h-12 text-base font-bold shadow-md bg-green-600 hover:bg-green-700"
+              onClick={handleGenerate}
+            >
+              <RotateCcw className="mr-2 h-5 w-5" />
+              Everything Synced! Start Next Story
+            </Button>
+          ) : hasPending && (
+            <Button
+              className="w-full h-12 text-base font-bold shadow-md bg-blue-600 hover:bg-blue-700"
+              onClick={handleBatchSubmit}
+              disabled={submitBatchReviewMutation.isPending}
+            >
+              {submitBatchReviewMutation.isPending ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-5 w-5" />
+              )}
+              Sync Progress ({Object.keys(pendingRatings).length} words)
+            </Button>
+          )}
+        </div>
 
         {words.length > 0 && (
           <div className="space-y-4">
@@ -456,7 +469,6 @@ export function WordSelection() {
         )}
       </div>
 
-      {/* Right Column: Story Generation */}
       <div className="h-full overflow-y-auto pr-4 pb-8 relative">
         {floatingMenu && (
           <div 

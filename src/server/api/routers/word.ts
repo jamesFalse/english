@@ -24,83 +24,84 @@ export const wordRouter = createTRPCRouter({
   generateSelection: publicProcedure
     .input(
       z.object({
-        basic: z.number().min(0).max(100),
-        independent: z.number().min(0).max(100),
-        proficient: z.number().min(0).max(100),
-        limit: z.number().min(1).max(100).default(30),
-        reviewRatio: z.number().min(0).max(100).default(70),
+        reviewCount: z.number().min(0).max(100),
+        basicCount: z.number().min(0).max(100),
+        independentCount: z.number().min(0).max(100),
+        proficientCount: z.number().min(0).max(100),
       })
     )
     .query(async ({ ctx, input }) => {
-      const { basic, independent, proficient, limit, reviewRatio } = input;
+      const { reviewCount, basicCount, independentCount, proficientCount } = input;
       const now = new Date();
 
-      // Calculate the maximum number of words allowed for review
-      const maxReviewCount = Math.floor(limit * (reviewRatio / 100));
+      // 1. Fetch Due Review Words (Any CEFR)
+      const fetchReviewWords = async () => {
+        if (reviewCount <= 0) return [];
+        const dueWords = await ctx.db.word.findMany({
+          where: {
+            due: { lte: now },
+            state: { gt: 0 },
+          },
+          orderBy: { due: "asc" },
+          take: reviewCount * 3, // Oversample for shuffle
+        });
+        return dueWords.sort(() => Math.random() - 0.5).slice(0, reviewCount);
+      };
 
-      const dueWords = await ctx.db.word.findMany({
-        where: {
-          due: { lte: now },
-          state: { gt: 0 },
-        },
-        orderBy: {
-          due: 'asc',
-        },
-        take: maxReviewCount,
-      });
+      // 2. Helper to fetch new words with diversity logic
+      const getDiverseNewWords = async (cefrs: string[], count: number) => {
+        if (count <= 0) return [];
+        
+        // Fetch a generous pool of candidates to ensure diversity and quantity
+        const candidates = await ctx.db.word.findMany({
+          where: { state: 0, cefr: { in: cefrs } },
+          take: Math.max(count * 10, 100), 
+        });
 
-      let selection = [...dueWords];
+        if (candidates.length === 0) return [];
 
-      // Fill the remaining gap with new words
-      const gap = limit - selection.length;
-      
-      if (gap > 0) {
-        const basicQuota = Math.round(gap * (basic / 100));
-        const independentQuota = Math.round(gap * (independent / 100));
-        const proficientQuota = Math.max(0, gap - basicQuota - independentQuota);
+        // Shuffle candidates
+        const shuffled = candidates.sort(() => Math.random() - 0.5);
 
-        const getDiverseNewWords = async (cefrs: string[], targetCount: number) => {
-          if (targetCount <= 0) return [];
-          const oversampleCount = targetCount * 3;
-          const allMatchingIds = await ctx.db.word.findMany({
-            where: { state: 0, cefr: { in: cefrs } },
-            select: { id: true },
-          });
-          const sampledIds = allMatchingIds
-            .map((w) => w.id)
-            .sort(() => Math.random() - 0.5)
-            .slice(0, oversampleCount);
+        const result: typeof candidates = [];
+        const letterMap = new Map<string, number>();
+        const remaining: typeof candidates = [];
 
-          const candidates = await ctx.db.word.findMany({
-            where: { id: { in: sampledIds } },
-          });
-          candidates.sort(() => Math.random() - 0.5);
-
-          const result: typeof candidates = [];
-          const letterMap = new Map<string, number>();
-
-          for (const word of candidates) {
-            if (result.length >= targetCount) break;
-            if (!word.text) continue;
-            const firstLetter = word.text.charAt(0).toLowerCase();
-            const count = letterMap.get(firstLetter) || 0;
-            if (count < 2) {
-              result.push(word);
-              letterMap.set(firstLetter, count + 1);
-            }
+        // First Pass: Try to satisfy diversity (max 2 per letter)
+        for (const word of shuffled) {
+          const firstLetter = word.text.charAt(0).toLowerCase();
+          const letterCount = letterMap.get(firstLetter) || 0;
+          
+          if (result.length < count && letterCount < 2) {
+            result.push(word);
+            letterMap.set(firstLetter, letterCount + 1);
+          } else {
+            remaining.push(word);
           }
-          return result;
-        };
+        }
 
-        const [newBasic, newIndependent, newProficient] = await Promise.all([
-          getDiverseNewWords(["A1", "A2"], basicQuota),
-          getDiverseNewWords(["B1", "B2"], independentQuota),
-          getDiverseNewWords(["C1", "C2"], proficientQuota),
-        ]);
-        selection = [...selection, ...newBasic, ...newIndependent, ...newProficient];
-      }
+        // Second Pass: If we fall short due to diversity filtering, 
+        // fill up with remaining words to reach the requested count.
+        // We only return fewer if the DB literally has no more words.
+        while (result.length < count && remaining.length > 0) {
+          const nextWord = remaining.shift();
+          if (nextWord) result.push(nextWord);
+        }
 
-      return selection.sort(() => Math.random() - 0.5).slice(0, limit);
+        return result;
+      };
+
+      // 3. Parallel fetching
+      const [reviewWords, newBasic, newIndependent, newProficient] = await Promise.all([
+        fetchReviewWords(),
+        getDiverseNewWords(["A1", "A2"], basicCount),
+        getDiverseNewWords(["B1", "B2"], independentCount),
+        getDiverseNewWords(["C1", "C2"], proficientCount),
+      ]);
+
+      // 4. Combine and final shuffle
+      const selection = [...reviewWords, ...newBasic, ...newIndependent, ...newProficient];
+      return selection.sort(() => Math.random() - 0.5);
     }),
 
   generateStory: publicProcedure
