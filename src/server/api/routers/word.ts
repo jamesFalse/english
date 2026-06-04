@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { callGemini } from "~/server/lib/gemini";
+import { callProvider } from "~/server/lib/provider";
 import { Prisma, type Word } from "@prisma/client";
 import { fsrs, Rating, createEmptyCard, type Grade } from "ts-fsrs";
 
@@ -160,6 +160,7 @@ export const wordRouter = createTRPCRouter({
       const { words, difficulty, theme } = input;
       const wordCount = words.length;
       const targetLength = Math.max(80, wordCount * 15);
+      const start = Date.now();
 
       const themeContext = theme && theme !== "General" 
         ? `The story should be set in or related to: **${theme}**. 
@@ -180,9 +181,17 @@ export const wordRouter = createTRPCRouter({
         - No Markdown formatting.
       `;
 
-      return callGemini(prompt, { 
+      const story = await callProvider(prompt, { 
         systemInstruction: STORY_SYSTEM_PROMPT 
       });
+
+      if (process.env.NODE_ENV === "development") {
+        console.info(
+          `[word.generateStory] words=${wordCount} targetLength=${targetLength} duration=${Date.now() - start}ms`,
+        );
+      }
+
+      return story;
     }),
 
   submitReview: publicProcedure

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { callGemini } from "~/server/lib/gemini";
+import { callProvider } from "~/server/lib/provider";
 
 const SYSTEM_INSTRUCTION = `
 你是一个认知语言学家。请分析用户提供的英语文本，专注于解析长难句的“母语者阅读逻辑”。
@@ -66,7 +66,7 @@ export const analyzeRouter = createTRPCRouter({
   analyzeText: publicProcedure
     .input(z.object({ text: z.string().min(1) }))
     .mutation(async ({ input }) => {
-      const result = await callGemini(input.text, {
+      const result = await callProvider(input.text, {
         model: "gemini-3-flash-preview",
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",

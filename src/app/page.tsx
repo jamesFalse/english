@@ -175,6 +175,22 @@ export default function Home() {
             </div>
           </Card>
         </Link>
+
+        {/* Semantic Bridge */}
+        <Link href="/bridge" className="group">
+          <Card className="flex h-full flex-col p-8 transition-all hover:shadow-xl hover:-translate-y-1 border-2 hover:border-orange-500/50">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 transition-colors group-hover:bg-orange-600 group-hover:text-white">
+              <ArrowRight className="h-8 w-8" />
+            </div>
+            <h2 className="mb-3 text-2xl font-bold text-slate-900">Semantic Bridge</h2>
+            <p className="mb-6 flex-grow text-slate-500 leading-relaxed text-sm">
+              Bridge the gap between your thoughts and the most precise, concise English expressions.
+            </p>
+            <div className="flex items-center font-bold text-orange-600">
+              Build Bridge <ChevronRight className="ml-1 h-5 w-5 transition-transform group-hover:translate-x-1" />
+            </div>
+          </Card>
+        </Link>
       </div>
 
       <footer className="mt-16 text-slate-400 text-sm">

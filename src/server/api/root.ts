@@ -1,6 +1,7 @@
 import { wordRouter } from "~/server/api/routers/word";
 import { analyzeRouter } from "~/server/api/routers/analyze";
 import { grammarRouter } from "~/server/api/routers/grammar";
+import { bridgeRouter } from "~/server/api/routers/bridge";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 /**
@@ -12,6 +13,7 @@ export const appRouter = createTRPCRouter({
   word: wordRouter,
   analyze: analyzeRouter,
   grammar: grammarRouter,
+  bridge: bridgeRouter,
 });
 
 // export type definition of API

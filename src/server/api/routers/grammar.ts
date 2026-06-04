@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { callGemini } from "~/server/lib/gemini";
+import { callProvider } from "~/server/lib/provider";
 import { env } from "~/env";
 
 export interface GrammarIssue {
@@ -177,7 +177,7 @@ export const grammarRouter = createTRPCRouter({
           throw new Error("离线纠错引擎未就绪，请启动 LanguageTool 本地服务 (port 8081)");
         }
       } else {
-        const result = await callGemini(`TEXT: "${text}"`, {
+        const result = await callProvider(`TEXT: "${text}"`, {
           systemInstruction: GRAMMAR_SYSTEM_PROMPT,
           responseMimeType: "application/json",
         });

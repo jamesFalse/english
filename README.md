@@ -1,6 +1,6 @@
 # English Learning Tools
 
-An AI-powered English toolset built with the T3 Stack, designed to master vocabulary, grammar, and sentence logic. This project combines scientific spaced repetition (FSRS) with cutting-edge AI (Google Gemini) to provide a contextual and efficient learning experience.
+An AI-powered English toolset built with the T3 Stack, designed to master vocabulary, grammar, and sentence logic. This project combines scientific spaced repetition (FSRS) with cutting-edge AI (Google Gemini or DeepSeek) to provide a contextual and efficient learning experience.
 
 ## 🌟 Key Features
 
@@ -29,7 +29,7 @@ An AI-powered English toolset built with the T3 Stack, designed to master vocabu
 - **Framework**: Next.js 15 (App Router)
 - **API Layer**: tRPC (End-to-end type safety)
 - **Database**: Prisma + PostgreSQL
-- **AI**: Google Gemini (via `@google/genai`)
+- **AI**: Google Gemini (via `@google/genai`) or DeepSeek (via `openai`)
 - **Offline Engine**: LanguageTool (Local HTTP Server)
 - **UI**: Tailwind CSS + shadcn/ui + Radix UI
 
@@ -39,7 +39,9 @@ An AI-powered English toolset built with the T3 Stack, designed to master vocabu
    Create a `.env` file:
    ```env
    DATABASE_URL="postgresql://..."
+   PROVIDER="gemini" # "gemini" or "deepseek"
    GEMINI_API_KEY="your_key"
+   DEEPSEEK_API_KEY="your_key"
    RUNNING_ENV="local" # or 'web'
    PASSKEY="your_secure_password" # required if web
    ```

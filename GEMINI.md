@@ -14,7 +14,7 @@ The goal is to revolutionize English vocabulary acquisition by replacing rote me
 -   **Frontend**: Next.js 15 (App Router) for high-performance React rendering.
 -   **Backend**: tRPC for type-safe communication between the client and the database.
 -   **ORM**: Prisma with PostgreSQL, utilizing a scientifically-optimized `Word` model.
--   **AI**: Google Gemini (Default: **gemini-3-flash-preview**) via the central `callGemini` utility.
+-   **AI**: Google Gemini (Default: **gemini-3-flash-preview**) or DeepSeek (Default: **deepseek-v4-pro**) via the central `callProvider` utility, selected by `PROVIDER`.
 -   **Offline Engine**: Local LanguageTool HTTP server (port 8081).
 -   **Security**: Tiered protection via tRPC Middleware and Global `AuthGuard`.
 
@@ -50,7 +50,7 @@ The goal is to revolutionize English vocabulary acquisition by replacing rote me
 -   [x] **8.6: Error Analytics**: Dedicated summary tab with visual metrics.
 
 ## [x] Task 9: Unified Architecture & Security Layer
--   [x] **9.1: Centralized AI Utility**: Created `src/server/lib/gemini.ts` using `@google/genai`.
+-   [x] **9.1: Centralized AI Utility**: Created `src/server/lib/provider.ts` using `@google/genai` and `openai` for provider switching.
 -   [x] **9.2: Global Auth Guard**: Implemented `AuthGuard` to protect all routes in web mode.
 -   [x] **9.3: PASSKEY Protocol**: Server-side tRPC middleware with "Punitive Delay" (2s) for failed attempts.
 -   [x] **9.4: Environment Awareness**: Automatic UI adaptation for `local` vs. `web` environments.

@@ -11,7 +11,9 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    GEMINI_API_KEY: z.string(),
+    PROVIDER: z.enum(["gemini", "deepseek"]).default("gemini"),
+    GEMINI_API_KEY: z.string().optional(),
+    DEEPSEEK_API_KEY: z.string().optional(),
     HTTPS_PROXY: z.string().optional(),
     RUNNING_ENV: z.enum(["local", "web"]).default("local"),
     PASSKEY: z.string().min(8).optional(),
@@ -33,7 +35,9 @@ export const env = createEnv({
   runtimeEnv: {
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
+    PROVIDER: process.env.PROVIDER,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
     HTTPS_PROXY: process.env.HTTPS_PROXY,
     RUNNING_ENV: process.env.RUNNING_ENV,
     PASSKEY: process.env.PASSKEY,
@@ -53,4 +57,12 @@ export const env = createEnv({
 
 if (env.RUNNING_ENV === "web" && !env.PASSKEY) {
   throw new Error("PASSKEY is required when RUNNING_ENV is set to web.");
+}
+
+if (env.PROVIDER === "gemini" && !env.GEMINI_API_KEY) {
+  throw new Error("GEMINI_API_KEY is required when PROVIDER is set to gemini.");
+}
+
+if (env.PROVIDER === "deepseek" && !env.DEEPSEEK_API_KEY) {
+  throw new Error("DEEPSEEK_API_KEY is required when PROVIDER is set to deepseek.");
 }
