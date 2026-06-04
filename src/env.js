@@ -14,7 +14,7 @@ export const env = createEnv({
     GEMINI_API_KEY: z.string(),
     HTTPS_PROXY: z.string().optional(),
     RUNNING_ENV: z.enum(["local", "web"]).default("local"),
-    PASSKEY: z.string().optional(),
+    PASSKEY: z.string().min(8).optional(),
   },
 
   /**
@@ -50,3 +50,7 @@ export const env = createEnv({
    */
   emptyStringAsUndefined: true,
 });
+
+if (env.RUNNING_ENV === "web" && !env.PASSKEY) {
+  throw new Error("PASSKEY is required when RUNNING_ENV is set to web.");
+}

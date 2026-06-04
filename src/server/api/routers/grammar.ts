@@ -61,6 +61,41 @@ const calculateStats = (issues: GrammarIssue[]): GrammarStats => {
   };
 };
 
+const grammarIssueSchema = z.object({
+  offset: z.number().int().min(0),
+  length: z.number().int().min(0),
+  original: z.string(),
+  replacement: z.string().default(""),
+  type: z.enum(["grammar", "spelling", "style"]),
+  message: z.string(),
+});
+
+const languageToolMatchSchema = z.object({
+  offset: z.number().int().min(0),
+  length: z.number().int().min(0),
+  replacements: z.array(z.object({ value: z.string() })).optional(),
+  rule: z.object({ issueType: z.string().optional() }).optional(),
+  message: z.string(),
+});
+
+const normalizeIssues = (text: string, rawIssues: unknown[]): GrammarIssue[] => {
+  return rawIssues
+    .map((issue, index) => {
+      const parsed = grammarIssueSchema.safeParse(issue);
+      if (!parsed.success) return null;
+
+      const { offset, length } = parsed.data;
+      if (offset + length > text.length) return null;
+
+      return {
+        ...parsed.data,
+        original: text.substring(offset, offset + length),
+        id: `issue-${index}`,
+      };
+    })
+    .filter((issue): issue is GrammarIssue => issue !== null);
+};
+
 export const grammarRouter = createTRPCRouter({
   getSettings: publicProcedure.query(() => {
     return {
@@ -71,7 +106,7 @@ export const grammarRouter = createTRPCRouter({
   verifyPasskey: publicProcedure
     .input(z.object({ passkey: z.string() }))
     .mutation(async ({ input }) => {
-      const isValid = input.passkey === env.PASSKEY;
+      const isValid = Boolean(env.PASSKEY && input.passkey === env.PASSKEY);
       if (!isValid) {
         // 验证失败，强制延迟 2 秒，增加暴力破解成本
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -107,16 +142,29 @@ export const grammarRouter = createTRPCRouter({
             throw new Error(`LanguageTool server responded with ${response.status}`);
           }
 
-          const data = await response.json();
+          const data: unknown = await response.json();
+          const matches =
+            typeof data === "object" && data !== null && "matches" in data && Array.isArray(data.matches)
+              ? data.matches
+              : [];
           
-          const issues: GrammarIssue[] = data.matches.map((m: any, idx: number) => ({
+          const rawIssues = matches.flatMap((match) => {
+            const parsed = languageToolMatchSchema.safeParse(match);
+            if (!parsed.success) return [];
+
+            const issue = parsed.data;
+            return [{
+              offset: issue.offset,
+              length: issue.length,
+              original: text.substring(issue.offset, issue.offset + issue.length),
+              replacement: issue.replacements?.[0]?.value ?? "",
+              type: issue.rule?.issueType === "misspelling" ? "spelling" : "grammar",
+              message: issue.message,
+            }];
+          });
+          const issues = normalizeIssues(text, rawIssues).map((issue, idx) => ({
+            ...issue,
             id: `lt-${idx}`,
-            offset: m.offset,
-            length: m.length,
-            original: text.substring(m.offset, m.offset + m.length),
-            replacement: m.replacements?.[0]?.value || "",
-            type: m.rule.issueType === "misspelling" ? "spelling" : "grammar",
-            message: m.message,
           }));
 
           return { 
@@ -134,7 +182,11 @@ export const grammarRouter = createTRPCRouter({
           responseMimeType: "application/json",
         });
 
-        const issues: GrammarIssue[] = (result.issues || []).map((issue: any, index: number) => ({
+        const rawIssues =
+          typeof result === "object" && result !== null && "issues" in result && Array.isArray(result.issues)
+            ? result.issues
+            : [];
+        const issues = normalizeIssues(text, rawIssues).map((issue, index) => ({
           ...issue,
           id: `online-${index}`,
         }));
@@ -142,7 +194,7 @@ export const grammarRouter = createTRPCRouter({
         return {
           text,
           issues,
-          stats: result.stats || { grammar: 0, spelling: 0, style: 0, total: 0 },
+          stats: calculateStats(issues),
         };
       }
     }),

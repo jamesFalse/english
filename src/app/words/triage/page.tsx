@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardContent } from "~/components/ui/card";
 import { Loader2, Search, CheckCircle2, ChevronLeft, Filter } from "lucide-react";
 import Link from "next/link";
 
@@ -44,7 +44,7 @@ export default function TriagePage() {
       }, 100);
       return { interval };
     },
-    onSuccess: (res) => {
+    onSuccess: () => {
       setSyncProgress(100);
       setTimeout(() => setSyncProgress(null), 500);
       setSelectedIds(new Set());

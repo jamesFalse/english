@@ -5,7 +5,7 @@ import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
-import { Loader2, BookOpen, Map, ChevronRight } from "lucide-react";
+import { Loader2, BookOpen, Map } from "lucide-react";
 import Link from "next/link";
 
 interface Chunk {
@@ -126,7 +126,7 @@ export default function AnalyzePage() {
                             </h3>
                           </div>
                           <div className="rounded-xl bg-slate-900 p-4 text-sm font-medium italic text-slate-100">
-                            "{s.logic_summary}"
+                            &quot;{s.logic_summary}&quot;
                           </div>
 
                           <div className="relative ml-2 border-l-2 border-slate-100 pl-6 space-y-8">

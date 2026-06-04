@@ -20,6 +20,7 @@ export default function GrammarPage() {
   const checkMutation = api.grammar.check.useMutation({
     onSuccess: (data) => {
       setResult(data);
+      setActiveTab("list");
     },
     onError: (error) => {
       alert("Check failed: " + error.message);
@@ -80,7 +81,7 @@ export default function GrammarPage() {
     const elements = [];
     let lastIndex = 0;
     
-    sortedIssues.forEach((issue, idx) => {
+    sortedIssues.forEach((issue) => {
       // Add text before the issue
       if (issue.offset > lastIndex) {
         elements.push(originalText.substring(lastIndex, issue.offset));
@@ -109,7 +110,7 @@ export default function GrammarPage() {
                 <p className="text-sm font-medium leading-relaxed">{issue.message}</p>
                 {issue.replacement && (
                   <div className="mt-2 flex flex-col gap-2">
-                    <p className="text-xs text-slate-500 italic">Suggestion: <span className="font-bold text-green-600">"{issue.replacement}"</span></p>
+                    <p className="text-xs text-slate-500 italic">Suggestion: <span className="font-bold text-green-600">&quot;{issue.replacement}&quot;</span></p>
                     <Button 
                       size="sm" 
                       variant="outline" 
@@ -136,6 +137,19 @@ export default function GrammarPage() {
     
     return <div className="whitespace-pre-wrap leading-relaxed text-lg">{elements}</div>;
   };
+
+  const qualityNeed = result
+    ? result.stats.total > 5
+      ? "significant"
+      : result.stats.total > 0
+        ? "minor"
+        : "no"
+    : "no";
+  const summaryTitle = result
+    ? result.stats.total === 0
+      ? "Perfect!"
+      : `${result.stats.total} Issues Found`
+    : "";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -187,7 +201,10 @@ export default function GrammarPage() {
               </label>
               <textarea
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  setResult(null);
+                }}
                 onKeyDown={handleKeyDown}
                 className="h-80 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 leading-relaxed text-slate-800 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-500"
                 placeholder="Paste your English text here. Press Shift+Enter to analyze..."
@@ -255,7 +272,7 @@ export default function GrammarPage() {
                                 </div>
                                 <p className="text-base font-bold text-slate-800">
                                   <span className="line-through opacity-40 mr-2">{issue.original}</span>
-                                  {issue.replacement && <span className="text-green-600">→ {issue.replacement}</span>}
+                              {issue.replacement && <span className="text-green-600">→ {issue.replacement}</span>}
                                 </p>
                                 <p className="text-sm text-slate-600">{issue.message}</p>
                               </div>
@@ -303,10 +320,8 @@ export default function GrammarPage() {
                         <h4 className="mb-4 text-sm font-bold uppercase tracking-widest text-slate-400">Analysis Result</h4>
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-3xl font-bold">
-                              {result.stats.total === 0 ? "Perfect!" : `${result.stats.total} Issues Found`}
-                            </p>
-                            <p className="mt-1 text-slate-400">Overall text quality needs {result.stats.total > 5 ? "significant" : result.stats.total > 0 ? "minor" : "no"} improvement.</p>
+                            <p className="text-3xl font-bold">{summaryTitle}</p>
+                            <p className="mt-1 text-slate-400">Overall text quality needs {qualityNeed} improvement.</p>
                           </div>
                           <CheckCircle2 className={`h-12 w-12 ${result.stats.total === 0 ? "text-green-400" : "text-slate-600"}`} />
                         </div>
@@ -321,7 +336,7 @@ export default function GrammarPage() {
                   <AlertCircle className="h-8 w-8 text-slate-400" />
                 </div>
                 <p className="font-medium text-slate-400">Awaiting input for grammar analysis...</p>
-                <p className="mt-2 text-sm text-slate-400">Paste your text and click "Check Grammar" to begin.</p>
+                <p className="mt-2 text-sm text-slate-400">Paste your text and click &quot;Check Grammar&quot; to begin.</p>
               </div>
             )}
           </section>

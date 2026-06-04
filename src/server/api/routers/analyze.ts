@@ -38,6 +38,30 @@ const SYSTEM_INSTRUCTION = `
 }
 `;
 
+const chunkSchema = z.object({
+  text: z.string(),
+  mental_note: z.string(),
+  logic_tag: z.string(),
+  color_class: z.enum([
+    "text-slate-900 font-bold",
+    "text-blue-600",
+    "text-green-600",
+    "text-orange-600",
+    "text-purple-600",
+  ]).catch("text-slate-900 font-bold"),
+});
+
+const sentenceSchema = z.object({
+  original: z.string(),
+  difficulty: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]).catch("B2"),
+  logic_summary: z.string(),
+  chunks: z.array(chunkSchema).default([]),
+});
+
+const analysisSchema = z.object({
+  sentences: z.array(sentenceSchema).default([]),
+});
+
 export const analyzeRouter = createTRPCRouter({
   analyzeText: publicProcedure
     .input(z.object({ text: z.string().min(1) }))
@@ -50,14 +74,14 @@ export const analyzeRouter = createTRPCRouter({
 
       // 防御性检查
       if (!result || typeof result !== 'object') return { sentences: [] };
-      if (Array.isArray(result)) return { sentences: result };
+      if (Array.isArray(result)) return analysisSchema.parse({ sentences: result });
       
       // 兼容 AI 返回了 sentences 键但不是数组，或者直接返回了数组内容的情况
-      if (!result.sentences || !Array.isArray(result.sentences)) {
+      if (!("sentences" in result) || !Array.isArray(result.sentences)) {
         const potentialArray = Object.values(result).find(val => Array.isArray(val));
-        return { sentences: Array.isArray(potentialArray) ? potentialArray : [] };
+        return analysisSchema.parse({ sentences: Array.isArray(potentialArray) ? potentialArray : [] });
       }
 
-      return result;
+      return analysisSchema.parse(result);
     }),
 });
