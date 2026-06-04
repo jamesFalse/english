@@ -9,6 +9,95 @@ import { Volume2, Loader2, BookOpen, CheckCircle2, RotateCcw, Save, ChevronDown,
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Rating } from "ts-fsrs";
 
+const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
+
+type CefrLevel = (typeof CEFR_LEVELS)[number];
+type ReviewRating = Rating.Again | Rating.Hard | Rating.Good | Rating.Easy;
+type SelectedWord = { id: number; text: string; cefr: string };
+type WordQuotas = {
+  reviewCount: number;
+  basicCount: number;
+  independentCount: number;
+  proficientCount: number;
+};
+type SelectionStats = {
+  review: number;
+  basic: number;
+  independent: number;
+  proficient: number;
+  total: number;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const parseJson = (value: string): unknown => {
+  const parsed: unknown = JSON.parse(value);
+  return parsed;
+};
+
+const isCefrLevel = (value: string): value is CefrLevel =>
+  value === "A1" || value === "A2" || value === "B1" || value === "B2" || value === "C1" || value === "C2";
+
+const isRating = (value: unknown): value is ReviewRating =>
+  value === 1 || value === 2 || value === 3 || value === 4;
+
+const parsePendingRatings = (value: unknown): Record<number, ReviewRating> => {
+  if (!isRecord(value)) return {};
+
+  const ratings: Record<number, ReviewRating> = {};
+  for (const [id, rating] of Object.entries(value)) {
+    const numericId = Number(id);
+    if (Number.isInteger(numericId) && isRating(rating)) {
+      ratings[numericId] = rating;
+    }
+  }
+
+  return ratings;
+};
+
+const parseSelectedWords = (value: unknown): SelectedWord[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((word) => {
+    if (!isRecord(word)) return [];
+    if (typeof word.id !== "number" || typeof word.text !== "string" || typeof word.cefr !== "string") return [];
+    return [{ id: word.id, text: word.text, cefr: word.cefr }];
+  });
+};
+
+const parseSelectionStats = (value: unknown): SelectionStats | null => {
+  if (!isRecord(value)) return null;
+
+  const { review, basic, independent, proficient, total } = value;
+  if (
+    typeof review !== "number" ||
+    typeof basic !== "number" ||
+    typeof independent !== "number" ||
+    typeof proficient !== "number" ||
+    typeof total !== "number"
+  ) {
+    return null;
+  }
+
+  return { review, basic, independent, proficient, total };
+};
+
+const parseNumberArray = (value: unknown): number[] =>
+  Array.isArray(value) ? value.filter((item): item is number => typeof item === "number") : [];
+
+const parseQuotas = (value: unknown): WordQuotas => {
+  const fallback = { reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 5 };
+  if (!isRecord(value)) return fallback;
+
+  return {
+    reviewCount: typeof value.reviewCount === "number" ? value.reviewCount : fallback.reviewCount,
+    basicCount: typeof value.basicCount === "number" ? value.basicCount : fallback.basicCount,
+    independentCount: typeof value.independentCount === "number" ? value.independentCount : fallback.independentCount,
+    proficientCount: typeof value.proficientCount === "number" ? value.proficientCount : fallback.proficientCount,
+  };
+};
+
 const cefrColor = (cefr: string) => {
   if (cefr.startsWith("A")) return "text-green-500";
   if (cefr.startsWith("B")) return "text-blue-500";
@@ -24,21 +113,21 @@ const ratingLabels: Record<number, string> = {
 };
 
 export function WordSelection() {
-  const [quotas, setQuotas] = useState({ reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 5 });
+  const [quotas, setQuotas] = useState<WordQuotas>({ reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 5 });
   const [isConfigOpen, setIsConfigOpen] = useState(true);
-  const [words, setWords] = useState<any[]>([]);
-  const [difficulty, setDifficulty] = useState("B1");
+  const [words, setWords] = useState<SelectedWord[]>([]);
+  const [selectionStats, setSelectionStats] = useState<SelectionStats | null>(null);
+  const [difficulty, setDifficulty] = useState<CefrLevel>("B1");
   const [theme, setTheme] = useState("General");
   const [story, setStory] = useState("");
 
   // New States for Batching and Undo
-  const [pendingRatings, setPendingRatings] = useState<Record<number, Rating>>({});
+  const [pendingRatings, setPendingRatings] = useState<Record<number, ReviewRating>>({});
   const [syncedIds, setSyncedIds] = useState<Set<number>>(new Set());
 
   // Floating UI State
   const [floatingMenu, setFloatingMenu] = useState<{ x: number, y: number, wordId: number } | null>(null);
 
-  const utils = api.useUtils();
   const generateQuery = api.word.generateSelection.useQuery(
     quotas,
     { enabled: false }
@@ -78,33 +167,30 @@ export function WordSelection() {
   useEffect(() => {
     const savedRatings = localStorage.getItem("pendingRatings");
     const savedWords = localStorage.getItem("currentWords");
+    const savedSelectionStats = localStorage.getItem("currentSelectionStats");
     const savedSyncedIds = localStorage.getItem("syncedIds");
     const savedStory = localStorage.getItem("currentStory");
     const savedQuotas = localStorage.getItem("wordQuotas");
     const savedTheme = localStorage.getItem("currentTheme");
 
     if (savedRatings) {
-      try { setPendingRatings(JSON.parse(savedRatings)); } catch (e) { console.error(e); }
+      try { setPendingRatings(parsePendingRatings(parseJson(savedRatings))); } catch (e) { console.error(e); }
     }
     if (savedWords) {
-      try { setWords(JSON.parse(savedWords)); } catch (e) { console.error(e); }
+      try { setWords(parseSelectedWords(parseJson(savedWords))); } catch (e) { console.error(e); }
+    }
+    if (savedSelectionStats) {
+      try { setSelectionStats(parseSelectionStats(parseJson(savedSelectionStats))); } catch (e) { console.error(e); }
     }
     if (savedSyncedIds) {
-      try { setSyncedIds(new Set(JSON.parse(savedSyncedIds))); } catch (e) { console.error(e); }
+      try { setSyncedIds(new Set(parseNumberArray(parseJson(savedSyncedIds)))); } catch (e) { console.error(e); }
     }
     if (savedStory) {
       setStory(savedStory);
     }
     if (savedQuotas) {
       try { 
-        const parsed = JSON.parse(savedQuotas);
-        const migrated = {
-          reviewCount: parsed.reviewCount ?? 20,
-          basicCount: parsed.basicCount ?? 10,
-          independentCount: parsed.independentCount ?? 10,
-          proficientCount: parsed.proficientCount ?? 5,
-        };
-        setQuotas(migrated);
+        setQuotas(parseQuotas(parseJson(savedQuotas)));
         setIsConfigOpen(false); 
       } catch (e) { console.error(e); }
     }
@@ -139,6 +225,14 @@ export function WordSelection() {
   }, [words]);
 
   useEffect(() => {
+    if (selectionStats) {
+      localStorage.setItem("currentSelectionStats", JSON.stringify(selectionStats));
+    } else {
+      localStorage.removeItem("currentSelectionStats");
+    }
+  }, [selectionStats]);
+
+  useEffect(() => {
     localStorage.setItem("syncedIds", JSON.stringify(Array.from(syncedIds)));
   }, [syncedIds]);
 
@@ -160,23 +254,21 @@ export function WordSelection() {
 
     const { data } = await generateQuery.refetch();
     if (data) {
-      setWords(data);
+      setWords(data.words);
+      setSelectionStats(data.stats);
       setStory("");
       setPendingRatings({});
       setSyncedIds(new Set());
       localStorage.removeItem("pendingRatings");
       localStorage.removeItem("currentWords");
+      localStorage.removeItem("currentSelectionStats");
       localStorage.removeItem("syncedIds");
       localStorage.removeItem("currentStory");
       setIsConfigOpen(false); 
     }
   };
 
-  const wordIdToNum = (id: any): number => {
-    return typeof id === "string" ? parseInt(id) : id;
-  };
-
-  const unratedWords = words.filter(w => !syncedIds.has(w.id) && pendingRatings[wordIdToNum(w.id)] === undefined);
+  const unratedWords = words.filter(w => !syncedIds.has(w.id) && pendingRatings[w.id] === undefined);
 
   const handleGenerateStory = () => {
     if (unratedWords.length === 0) return;
@@ -188,7 +280,7 @@ export function WordSelection() {
     });
   };
 
-  const handleReview = (wordId: number, rating: Rating) => {
+  const handleReview = (wordId: number, rating: ReviewRating) => {
     if (syncedIds.has(wordId)) return;
 
     setPendingRatings((prev) => ({ ...prev, [wordId]: rating }));
@@ -252,18 +344,58 @@ export function WordSelection() {
 
   const allSynced = words.length > 0 && syncedIds.size === words.length;
   const hasPending = Object.keys(pendingRatings).length > 0;
+  const selectionStatItems = selectionStats
+    ? [
+        { label: "Review", value: selectionStats.review, requested: quotas.reviewCount, className: "text-orange-600 bg-orange-50 border-orange-100" },
+        { label: "Basic", value: selectionStats.basic, requested: quotas.basicCount, className: "text-green-600 bg-green-50 border-green-100" },
+        { label: "Indep.", value: selectionStats.independent, requested: quotas.independentCount, className: "text-blue-600 bg-blue-50 border-blue-100" },
+        { label: "Profic.", value: selectionStats.proficient, requested: quotas.proficientCount, className: "text-purple-600 bg-purple-50 border-purple-100" },
+      ]
+    : [];
+
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
 
   const processedStory = () => {
     if (!story) return "";
-    let html = story.replace(/\n/g, "<br />");
-    words.forEach(word => {
-      const isRated = syncedIds.has(word.id) || pendingRatings[word.id] !== undefined;
-      if (isRated) {
-        const regex = new RegExp(`<mark data-word="${word.text}"`, "gi");
-        html = html.replace(regex, `<mark data-word="${word.text}" data-rated="true"`);
+    const allowedWords = new Map(words.map((word) => [word.text.toLowerCase(), word]));
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(story.replace(/\n/g, "<br>"), "text/html");
+
+    const sanitizeNode = (node: Node): string => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return escapeHtml(node.textContent ?? "");
       }
-    });
-    return html;
+
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return "";
+      }
+
+      const element = node as HTMLElement;
+      const tagName = element.tagName.toLowerCase();
+      const children = Array.from(element.childNodes).map(sanitizeNode).join("");
+
+      if (tagName === "br") return "<br>";
+      if (tagName === "u") return `<u>${children}</u>`;
+      if (tagName === "mark") {
+        const rawWord = element.getAttribute("data-word") ?? "";
+        const word = allowedWords.get(rawWord.toLowerCase());
+        if (!word) return children;
+
+        const isRated = syncedIds.has(word.id) || pendingRatings[word.id] !== undefined;
+        const ratedAttr = isRated ? ' data-rated="true"' : "";
+        return `<mark data-word="${escapeHtml(word.text)}"${ratedAttr}>${children}</mark>`;
+      }
+
+      return children;
+    };
+
+    return Array.from(doc.body.childNodes).map(sanitizeNode).join("");
   };
 
   return (
@@ -370,6 +502,20 @@ export function WordSelection() {
           )}
         </div>
 
+        {selectionStats && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {selectionStatItems.map((item) => (
+              <div key={item.label} className={`rounded-lg border p-3 ${item.className}`}>
+                <div className="text-[10px] font-black uppercase tracking-wider opacity-75">{item.label}</div>
+                <div className="mt-1 flex items-end gap-1">
+                  <span className="text-2xl font-black leading-none">{item.value}</span>
+                  <span className="text-xs font-bold opacity-60">/ {item.requested}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {words.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between px-2">
@@ -424,42 +570,44 @@ export function WordSelection() {
                         </div>
                       </div>
 
-                      {!isSynced && pendingRating === undefined && (
-                        <div className="grid grid-cols-4 gap-1.5 mt-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-[11px] h-8 px-1 font-bold bg-red-50 hover:bg-red-100 hover:text-red-700 border-red-200 transition-colors"
-                            onClick={() => handleReview(word.id, Rating.Again)}
-                          >
-                            Again
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-[11px] h-8 px-1 font-bold bg-orange-50 hover:bg-orange-100 hover:text-orange-700 border-orange-200 transition-colors"
-                            onClick={() => handleReview(word.id, Rating.Hard)}
-                          >
-                            Hard
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-[11px] h-8 px-1 font-bold bg-green-50 hover:bg-green-100 hover:text-green-700 border-green-200 transition-colors"
-                            onClick={() => handleReview(word.id, Rating.Good)}
-                          >
-                            Good
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-[11px] h-8 px-1 font-bold bg-blue-50 hover:bg-blue-100 hover:text-blue-700 border-blue-200 transition-colors"
-                            onClick={() => handleReview(word.id, Rating.Easy)}
-                          >
-                            Easy
-                          </Button>
-                        </div>
-                      )}
+                      <div className="grid min-h-8 grid-cols-4 gap-1.5 mt-2">
+                        {!isSynced && pendingRating === undefined && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-[11px] h-8 px-1 font-bold bg-red-50 hover:bg-red-100 hover:text-red-700 border-red-200 transition-colors"
+                              onClick={() => handleReview(word.id, Rating.Again)}
+                            >
+                              Again
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-[11px] h-8 px-1 font-bold bg-orange-50 hover:bg-orange-100 hover:text-orange-700 border-orange-200 transition-colors"
+                              onClick={() => handleReview(word.id, Rating.Hard)}
+                            >
+                              Hard
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-[11px] h-8 px-1 font-bold bg-green-50 hover:bg-green-100 hover:text-green-700 border-green-200 transition-colors"
+                              onClick={() => handleReview(word.id, Rating.Good)}
+                            >
+                              Good
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-[11px] h-8 px-1 font-bold bg-blue-50 hover:bg-blue-100 hover:text-blue-700 border-blue-200 transition-colors"
+                              onClick={() => handleReview(word.id, Rating.Easy)}
+                            >
+                              Easy
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 );
@@ -496,12 +644,14 @@ export function WordSelection() {
                 <div className="grid grid-cols-2 gap-4 w-full">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Story Level</label>
-                    <Select value={difficulty} onValueChange={(val) => val && setDifficulty(val)}>
+                    <Select value={difficulty} onValueChange={(val) => {
+                      if (typeof val === "string" && isCefrLevel(val)) setDifficulty(val);
+                    }}>
                       <SelectTrigger className="h-9 bg-background shadow-sm border-muted-foreground/20">
                         <SelectValue placeholder="Select difficulty" />
                       </SelectTrigger>
                       <SelectContent>
-                        {["A1", "A2", "B1", "B2", "C1", "C2"].map((level) => (
+                        {CEFR_LEVELS.map((level) => (
                           <SelectItem key={level} value={level}>
                             {level} - {level.startsWith("A") ? "Basic" : level.startsWith("B") ? "Intermediate" : "Advanced"}
                           </SelectItem>

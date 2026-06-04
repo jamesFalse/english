@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { callGemini } from "~/server/lib/gemini";
-import { env } from "~/env";
+import { Prisma, type Word } from "@prisma/client";
 import { fsrs, Rating, createEmptyCard, type Grade } from "ts-fsrs";
 
 const STORY_SYSTEM_PROMPT = `
@@ -19,6 +19,69 @@ STRATEGIC INSTRUCTIONS:
 5. CEFR ALIGNMENT: Strictly adhere to the requested CEFR level.
 6. COHERENCE: The story must be a single, flowing narrative.
 `;
+
+const reviewRatingSchema = z.union([
+  z.literal(Rating.Again),
+  z.literal(Rating.Hard),
+  z.literal(Rating.Good),
+  z.literal(Rating.Easy),
+]);
+
+const toGrade = (rating: Rating): Grade => {
+  if (
+    rating !== Rating.Again &&
+    rating !== Rating.Hard &&
+    rating !== Rating.Good &&
+    rating !== Rating.Easy
+  ) {
+    throw new Error("Invalid review rating");
+  }
+
+  return rating;
+};
+
+const shuffleWords = <T>(words: T[]) => [...words].sort(() => Math.random() - 0.5);
+
+const pickAlphabeticallyDiverseWords = (candidates: Word[], count: number) => {
+  if (count <= 0) return [];
+  if (candidates.length <= count) return shuffleWords(candidates);
+
+  const ranked = candidates
+    .map((word, index) => ({ word, index }))
+    .sort((a, b) => a.word.text.localeCompare(b.word.text));
+
+  const selected: typeof ranked = [];
+  const selectedIndexes: number[] = [];
+  const available = new Set(ranked.map((_, index) => index));
+  const firstIndex = Math.floor(Math.random() * ranked.length);
+
+  selected.push(ranked[firstIndex]!);
+  selectedIndexes.push(firstIndex);
+  available.delete(firstIndex);
+
+  while (selected.length < count && available.size > 0) {
+    const scored = Array.from(available).map((index) => {
+      const minDistance = Math.min(...selectedIndexes.map((selectedIndex) => Math.abs(index - selectedIndex)));
+      return { index, minDistance };
+    });
+
+    scored.sort((a, b) => b.minDistance - a.minDistance);
+
+    const bestDistance = scored[0]?.minDistance ?? 0;
+    const bestIndexes = scored
+      .filter((item) => item.minDistance === bestDistance)
+      .map((item) => item.index);
+    const nextIndex = bestIndexes[Math.floor(Math.random() * bestIndexes.length)];
+
+    if (nextIndex === undefined) break;
+
+    selected.push(ranked[nextIndex]!);
+    selectedIndexes.push(nextIndex);
+    available.delete(nextIndex);
+  }
+
+  return shuffleWords(selected.map((item) => item.word));
+};
 
 export const wordRouter = createTRPCRouter({
   generateSelection: publicProcedure
@@ -51,44 +114,16 @@ export const wordRouter = createTRPCRouter({
       // 2. Helper to fetch new words with diversity logic
       const getDiverseNewWords = async (cefrs: string[], count: number) => {
         if (count <= 0) return [];
-        
-        // Fetch a generous pool of candidates to ensure diversity and quantity
+
         const candidates = await ctx.db.word.findMany({
-          where: { state: 0, cefr: { in: cefrs } },
-          take: Math.max(count * 10, 100), 
+          where: {
+            state: 0,
+            cefr: { in: cefrs },
+          },
+          orderBy: { text: "asc" },
         });
 
-        if (candidates.length === 0) return [];
-
-        // Shuffle candidates
-        const shuffled = candidates.sort(() => Math.random() - 0.5);
-
-        const result: typeof candidates = [];
-        const letterMap = new Map<string, number>();
-        const remaining: typeof candidates = [];
-
-        // First Pass: Try to satisfy diversity (max 2 per letter)
-        for (const word of shuffled) {
-          const firstLetter = word.text.charAt(0).toLowerCase();
-          const letterCount = letterMap.get(firstLetter) || 0;
-          
-          if (result.length < count && letterCount < 2) {
-            result.push(word);
-            letterMap.set(firstLetter, letterCount + 1);
-          } else {
-            remaining.push(word);
-          }
-        }
-
-        // Second Pass: If we fall short due to diversity filtering, 
-        // fill up with remaining words to reach the requested count.
-        // We only return fewer if the DB literally has no more words.
-        while (result.length < count && remaining.length > 0) {
-          const nextWord = remaining.shift();
-          if (nextWord) result.push(nextWord);
-        }
-
-        return result;
+        return pickAlphabeticallyDiverseWords(candidates, count);
       };
 
       // 3. Parallel fetching
@@ -101,15 +136,24 @@ export const wordRouter = createTRPCRouter({
 
       // 4. Combine and final shuffle
       const selection = [...reviewWords, ...newBasic, ...newIndependent, ...newProficient];
-      return selection.sort(() => Math.random() - 0.5);
+      return {
+        words: shuffleWords(selection),
+        stats: {
+          review: reviewWords.length,
+          basic: newBasic.length,
+          independent: newIndependent.length,
+          proficient: newProficient.length,
+          total: selection.length,
+        },
+      };
     }),
 
   generateStory: publicProcedure
     .input(
       z.object({
-        words: z.array(z.string()),
-        difficulty: z.string(), 
-        theme: z.string().optional(),
+        words: z.array(z.string().min(1)).min(1).max(100),
+        difficulty: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
+        theme: z.string().max(80).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -145,7 +189,7 @@ export const wordRouter = createTRPCRouter({
     .input(
       z.object({
         wordId: z.number(),
-        rating: z.nativeEnum(Rating),
+        rating: reviewRatingSchema,
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -165,7 +209,7 @@ export const wordRouter = createTRPCRouter({
       card.last_review = word.last_review ?? undefined;
 
       const schedulingCards = f.repeat(card, new Date());
-      const { card: updatedCard } = schedulingCards[rating as Grade]!;
+      const { card: updatedCard } = schedulingCards[toGrade(rating)];
 
       return ctx.db.word.update({
         where: { id: wordId },
@@ -188,7 +232,7 @@ export const wordRouter = createTRPCRouter({
       z.array(
         z.object({
           wordId: z.number(),
-          rating: z.nativeEnum(Rating),
+          rating: reviewRatingSchema,
         })
       )
     )
@@ -222,7 +266,7 @@ export const wordRouter = createTRPCRouter({
           card.last_review = word.last_review ?? undefined;
 
           const schedulingCards = f.repeat(card, now);
-          const { card: updatedCard } = schedulingCards[rating as Grade]!;
+          const { card: updatedCard } = schedulingCards[toGrade(rating)];
 
           // 将更新操作加入队列
           updatePromises.push(
@@ -263,10 +307,10 @@ export const wordRouter = createTRPCRouter({
       const { cefr, search, page, pageSize } = input;
       const skip = (page - 1) * pageSize;
       
-      const where = {
+      const where: Prisma.WordWhereInput = {
         state: 0,
         ...(cefr && cefr.length > 0 ? { cefr: { in: cefr } } : {}),
-        ...(search ? { text: { contains: search, mode: 'insensitive' } } : {}),
+        ...(search ? { text: { contains: search, mode: Prisma.QueryMode.insensitive } } : {}),
       };
 
       const [items, totalCount] = await Promise.all([
@@ -293,7 +337,7 @@ export const wordRouter = createTRPCRouter({
       // We calculate these values once to perform a high-performance bulk update.
       const card = createEmptyCard();
       const schedulingCards = f.repeat(card, now);
-      const { card: updatedCard } = schedulingCards[Rating.Good as Grade]!;
+      const { card: updatedCard } = schedulingCards[Rating.Good];
 
       const result = await ctx.db.word.updateMany({
         where: { id: { in: wordIds } },
