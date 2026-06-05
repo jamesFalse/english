@@ -346,10 +346,10 @@ export function WordSelection() {
   const hasPending = Object.keys(pendingRatings).length > 0;
   const selectionStatItems = selectionStats
     ? [
-        { label: "Review", value: selectionStats.review, requested: quotas.reviewCount, className: "text-orange-600 bg-orange-50 border-orange-100" },
-        { label: "Basic", value: selectionStats.basic, requested: quotas.basicCount, className: "text-green-600 bg-green-50 border-green-100" },
-        { label: "Indep.", value: selectionStats.independent, requested: quotas.independentCount, className: "text-blue-600 bg-blue-50 border-blue-100" },
-        { label: "Profic.", value: selectionStats.proficient, requested: quotas.proficientCount, className: "text-purple-600 bg-purple-50 border-purple-100" },
+        { label: "Review", value: selectionStats.review, requested: quotas.reviewCount, className: "text-orange-700 bg-orange-50 border-orange-100 dark:text-orange-300 dark:bg-orange-500/10 dark:border-orange-500/20" },
+        { label: "Basic", value: selectionStats.basic, requested: quotas.basicCount, className: "text-green-700 bg-green-50 border-green-100 dark:text-green-300 dark:bg-green-500/10 dark:border-green-500/20" },
+        { label: "Indep.", value: selectionStats.independent, requested: quotas.independentCount, className: "text-blue-700 bg-blue-50 border-blue-100 dark:text-blue-300 dark:bg-blue-500/10 dark:border-blue-500/20" },
+        { label: "Profic.", value: selectionStats.proficient, requested: quotas.proficientCount, className: "text-purple-700 bg-purple-50 border-purple-100 dark:text-purple-300 dark:bg-purple-500/10 dark:border-purple-500/20" },
       ]
     : [];
 
@@ -559,7 +559,7 @@ export function WordSelection() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 rounded-full text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                className="h-8 w-8 rounded-full text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:text-orange-400 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
                                 onClick={() => handleResetRating(word.id)}
                                 title="Reset Rating"
                               >
@@ -576,7 +576,7 @@ export function WordSelection() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-[11px] h-8 px-1 font-bold bg-red-50 hover:bg-red-100 hover:text-red-700 border-red-200 transition-colors"
+                              className="h-8 border-red-200 bg-red-50 px-1 text-[11px] font-bold text-red-700 transition-colors hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20 dark:hover:text-red-200"
                               onClick={() => handleReview(word.id, Rating.Again)}
                             >
                               Again
@@ -584,7 +584,7 @@ export function WordSelection() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-[11px] h-8 px-1 font-bold bg-orange-50 hover:bg-orange-100 hover:text-orange-700 border-orange-200 transition-colors"
+                              className="h-8 border-orange-200 bg-orange-50 px-1 text-[11px] font-bold text-orange-700 transition-colors hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/20 dark:hover:text-orange-200"
                               onClick={() => handleReview(word.id, Rating.Hard)}
                             >
                               Hard
@@ -592,7 +592,7 @@ export function WordSelection() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-[11px] h-8 px-1 font-bold bg-green-50 hover:bg-green-100 hover:text-green-700 border-green-200 transition-colors"
+                              className="h-8 border-green-200 bg-green-50 px-1 text-[11px] font-bold text-green-700 transition-colors hover:bg-green-100 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/20 dark:hover:text-green-200"
                               onClick={() => handleReview(word.id, Rating.Good)}
                             >
                               Good
@@ -600,7 +600,7 @@ export function WordSelection() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-[11px] h-8 px-1 font-bold bg-blue-50 hover:bg-blue-100 hover:text-blue-700 border-blue-200 transition-colors"
+                              className="h-8 border-blue-200 bg-blue-50 px-1 text-[11px] font-bold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 dark:hover:text-blue-200"
                               onClick={() => handleReview(word.id, Rating.Easy)}
                             >
                               Easy
@@ -624,10 +624,10 @@ export function WordSelection() {
             style={{ left: floatingMenu.x - 80, top: floatingMenu.y - 60 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-red-600 hover:bg-red-50" onClick={() => handleReview(floatingMenu.wordId, Rating.Again)}>Again</Button>
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-orange-600 hover:bg-orange-50" onClick={() => handleReview(floatingMenu.wordId, Rating.Hard)}>Hard</Button>
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-green-600 hover:bg-green-50" onClick={() => handleReview(floatingMenu.wordId, Rating.Good)}>Good</Button>
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-blue-600 hover:bg-blue-50" onClick={() => handleReview(floatingMenu.wordId, Rating.Easy)}>Easy</Button>
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Again)}>Again</Button>
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-orange-700 hover:bg-orange-50 dark:text-orange-300 dark:hover:bg-orange-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Hard)}>Hard</Button>
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Good)}>Good</Button>
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Easy)}>Easy</Button>
           </div>
         )}
 
@@ -696,7 +696,7 @@ export function WordSelection() {
                     dangerouslySetInnerHTML={{
                       __html: processedStory()
                     }}
-                    className="[&>mark]:bg-indigo-100/60 [&>mark]:text-indigo-900 [&>mark]:px-1 [&>mark]:py-0.5 [&>mark]:rounded [&>mark]:font-bold [&>mark]:border-b-2 [&>mark]:border-indigo-300/40 [&>mark]:transition-all [&>mark]:duration-300 [&>mark]:cursor-pointer hover:[&>mark]:bg-indigo-200/80 [&>mark[data-rated='true']]:opacity-40 [&>mark[data-rated='true']]:grayscale [&>mark[data-rated='true']]:cursor-default [&>u]:decoration-blue-400/50 [&>u]:decoration-dashed [&>u]:underline-offset-4 [&>u]:cursor-help text-base md:text-lg leading-relaxed text-foreground font-sans"
+                    className="[&>mark]:rounded [&>mark]:border-b-2 [&>mark]:border-indigo-300/40 [&>mark]:bg-indigo-100/70 [&>mark]:px-1 [&>mark]:py-0.5 [&>mark]:font-bold [&>mark]:text-indigo-900 [&>mark]:transition-all [&>mark]:duration-300 [&>mark]:cursor-pointer hover:[&>mark]:bg-indigo-200/80 dark:[&>mark]:bg-indigo-400/20 dark:[&>mark]:text-indigo-100 dark:hover:[&>mark]:bg-indigo-400/35 [&>mark[data-rated='true']]:cursor-default [&>mark[data-rated='true']]:opacity-40 [&>mark[data-rated='true']]:grayscale [&>u]:cursor-help [&>u]:decoration-blue-400/50 [&>u]:decoration-dashed [&>u]:underline-offset-4 font-sans text-base leading-relaxed text-foreground md:text-lg"
                   />
                 </div>
               )}

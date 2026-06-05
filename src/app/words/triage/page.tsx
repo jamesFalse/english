@@ -210,12 +210,12 @@ export default function TriagePage() {
                               className={`
                                 relative flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all duration-200
                                 ${selectedIds.has(word.id) 
-                                  ? "bg-blue-50 border-blue-500 shadow-sm" 
-                                  : "bg-card border-muted hover:border-blue-200 hover:bg-blue-50/30"}
+                                  ? "border-blue-500 bg-blue-50 shadow-sm dark:bg-blue-500/15" 
+                                  : "border-border bg-card hover:border-blue-300 hover:bg-blue-50/30 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/10"}
                               `}
                             >
                               <div className="flex flex-col min-w-0">
-                                <span className={`font-bold truncate ${selectedIds.has(word.id) ? "text-blue-700" : "text-foreground"}`}>
+                                <span className={`truncate font-bold ${selectedIds.has(word.id) ? "text-blue-700 dark:text-blue-300" : "text-foreground"}`}>
                                   {word.text}
                                 </span>
                                 <span className="text-[10px] font-black opacity-50 uppercase">{word.cefr}</span>

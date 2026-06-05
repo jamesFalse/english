@@ -11,11 +11,11 @@ const SYSTEM_INSTRUCTION = `
 1. 线性预期 (mental_note)：解释母语者看到这个语块时，潜意识在等待什么。例如看到 "Although..." 预期后面会有转折主句。
 2. 逻辑定位 (logic_tag)：识别语块的功能（如：背景铺垫、核心谓语、补充说明、逻辑转折、结果预警等）。
 3. 视觉编码 (color_class)：为不同功能的语块指定 Tailwind 颜色类：
-   - 核心逻辑 (主句/谓语): text-slate-900 font-bold
-   - 背景/让步 (背景铺垫): text-blue-600
-   - 修饰/补充 (定语从句/插入语): text-green-600
-   - 转折/逻辑钩子: text-orange-600
-   - 结果/影响: text-purple-600
+   - 核心逻辑 (主句/谓语): text-foreground font-bold
+   - 背景/让步 (背景铺垫): text-blue-600 dark:text-blue-300
+   - 修饰/补充 (定语从句/插入语): text-green-600 dark:text-green-300
+   - 转折/逻辑钩子: text-orange-600 dark:text-orange-300
+   - 结果/影响: text-purple-600 dark:text-purple-300
 4. 难度判断：为解析的句子判断 CEFR 等级 (A1-C2)。
 
 必须严格按照以下 JSON 格式输出：
@@ -43,12 +43,12 @@ const chunkSchema = z.object({
   mental_note: z.string(),
   logic_tag: z.string(),
   color_class: z.enum([
-    "text-slate-900 font-bold",
-    "text-blue-600",
-    "text-green-600",
-    "text-orange-600",
-    "text-purple-600",
-  ]).catch("text-slate-900 font-bold"),
+    "text-foreground font-bold",
+    "text-blue-600 dark:text-blue-300",
+    "text-green-600 dark:text-green-300",
+    "text-orange-600 dark:text-orange-300",
+    "text-purple-600 dark:text-purple-300",
+  ]).catch("text-foreground font-bold"),
 });
 
 const sentenceSchema = z.object({

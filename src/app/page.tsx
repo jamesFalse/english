@@ -117,12 +117,12 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-4 py-20">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4 py-20 text-foreground">
       <div className="mb-12 text-center">
-        <h1 className="mb-4 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-6xl">
+        <h1 className="mb-4 text-4xl font-extrabold tracking-tight text-foreground sm:text-6xl">
           English <span className="text-blue-600">Learning</span> Tools
         </h1>
-        <p className="text-xl text-slate-500">
+        <p className="text-xl text-muted-foreground">
           AI-powered tools to master English vocabulary, logic, and grammar.
         </p>
       </div>
@@ -130,12 +130,12 @@ export default function Home() {
       <div className="grid w-full max-w-5xl gap-8 md:grid-cols-2 lg:grid-cols-3">
         {/* Vocabulary Tool */}
         <Link href="/words" className="group">
-          <Card className="flex h-full flex-col p-8 transition-all hover:shadow-xl hover:-translate-y-1 border-2 hover:border-blue-500/50">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+          <Card className="flex h-full flex-col border-2 border-border/70 p-8 transition-all hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-950/30">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-400 transition-colors group-hover:bg-blue-600 group-hover:text-white">
               <BookOpen className="h-8 w-8" />
             </div>
-            <h2 className="mb-3 text-2xl font-bold text-slate-900">Vocabulary Builder</h2>
-            <p className="mb-6 flex-grow text-slate-500 leading-relaxed text-sm">
+            <h2 className="mb-3 text-2xl font-bold text-foreground">Vocabulary Builder</h2>
+            <p className="mb-6 flex-grow text-sm leading-relaxed text-muted-foreground">
               Master 5000+ Oxford words with scientific FSRS spaced repetition and AI-generated context stories.
             </p>
             <div className="flex items-center font-bold text-blue-600">
@@ -146,12 +146,12 @@ export default function Home() {
 
         {/* Analyze Tool */}
         <Link href="/analyze" className="group">
-          <Card className="flex h-full flex-col p-8 transition-all hover:shadow-xl hover:-translate-y-1 border-2 hover:border-purple-500/50">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-100 text-purple-600 transition-colors group-hover:bg-purple-600 group-hover:text-white">
+          <Card className="flex h-full flex-col border-2 border-border/70 p-8 transition-all hover:-translate-y-1 hover:border-purple-500/50 hover:shadow-xl hover:shadow-purple-950/30">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-500/15 text-purple-400 transition-colors group-hover:bg-purple-600 group-hover:text-white">
               <BrainCircuit className="h-8 w-8" />
             </div>
-            <h2 className="mb-3 text-2xl font-bold text-slate-900">Logic Flow Analyzer</h2>
-            <p className="mb-6 flex-grow text-slate-500 leading-relaxed text-sm">
+            <h2 className="mb-3 text-2xl font-bold text-foreground">Logic Flow Analyzer</h2>
+            <p className="mb-6 flex-grow text-sm leading-relaxed text-muted-foreground">
               Deconstruct complex sentences to understand how native speakers process logic linearly.
             </p>
             <div className="flex items-center font-bold text-purple-600">
@@ -162,12 +162,12 @@ export default function Home() {
 
         {/* Grammar Tool */}
         <Link href="/grammar" className="group">
-          <Card className="flex h-full flex-col p-8 transition-all hover:shadow-xl hover:-translate-y-1 border-2 hover:border-emerald-500/50">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
+          <Card className="flex h-full flex-col border-2 border-border/70 p-8 transition-all hover:-translate-y-1 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-950/30">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-400 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
               <Sparkles className="h-8 w-8" />
             </div>
-            <h2 className="mb-3 text-2xl font-bold text-slate-900">Grammar Corrector</h2>
-            <p className="mb-6 flex-grow text-slate-500 leading-relaxed text-sm">
+            <h2 className="mb-3 text-2xl font-bold text-foreground">Grammar Corrector</h2>
+            <p className="mb-6 flex-grow text-sm leading-relaxed text-muted-foreground">
               Polish your writing with instant grammar, spelling, and style suggestions (Online/Offline).
             </p>
             <div className="flex items-center font-bold text-emerald-600">
@@ -178,12 +178,12 @@ export default function Home() {
 
         {/* Semantic Bridge */}
         <Link href="/bridge" className="group">
-          <Card className="flex h-full flex-col p-8 transition-all hover:shadow-xl hover:-translate-y-1 border-2 hover:border-orange-500/50">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 transition-colors group-hover:bg-orange-600 group-hover:text-white">
+          <Card className="flex h-full flex-col border-2 border-border/70 p-8 transition-all hover:-translate-y-1 hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-950/30">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-400 transition-colors group-hover:bg-orange-600 group-hover:text-white">
               <ArrowRight className="h-8 w-8" />
             </div>
-            <h2 className="mb-3 text-2xl font-bold text-slate-900">Semantic Bridge</h2>
-            <p className="mb-6 flex-grow text-slate-500 leading-relaxed text-sm">
+            <h2 className="mb-3 text-2xl font-bold text-foreground">Semantic Bridge</h2>
+            <p className="mb-6 flex-grow text-sm leading-relaxed text-muted-foreground">
               Bridge the gap between your thoughts and the most precise, concise English expressions.
             </p>
             <div className="flex items-center font-bold text-orange-600">
@@ -193,7 +193,7 @@ export default function Home() {
         </Link>
       </div>
 
-      <footer className="mt-16 text-slate-400 text-sm">
+      <footer className="mt-16 text-sm text-muted-foreground">
         Built with T3 Stack & Gemini AI
       </footer>
     </main>

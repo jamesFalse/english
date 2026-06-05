@@ -20,7 +20,12 @@ An AI-powered English toolset built with the T3 Stack, designed to master vocabu
 - **Interactive UI**: Split-pane editor with "Issue List", "Live Preview" (high-lighting), and "Statistical Summary".
 - **Quick Fix**: One-click text replacement for identified issues.
 
-### 4. Security & Privacy
+### 4. Semantic Bridge
+- **Concept Translator**: Turns a Chinese fragment, rough idea, or abstract concept into the most natural English word or phrase.
+- **Context-Aware Matching**: Uses the target situation, such as casual chat, business, academic writing, or email, to choose a concise expression.
+- **Nuance Guidance**: Provides a short explanation and example sentence so the expression is easy to use correctly.
+
+### 5. Security & Privacy
 - **Private Access**: Optional `PASSKEY` protection for web deployments.
 - **Session Protection**: Automatic session cleanup and anti-brute-force delays.
 

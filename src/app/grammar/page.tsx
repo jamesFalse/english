@@ -94,27 +94,27 @@ export default function GrammarPage() {
             <TooltipTrigger>
               <span 
                 className={`cursor-help border-b-2 transition-all hover:bg-opacity-20 ${
-                  issue.type === 'spelling' ? 'border-red-400 bg-red-50' : 
-                  issue.type === 'grammar' ? 'border-blue-400 bg-blue-50' : 
-                  'border-amber-400 bg-amber-50'
+                  issue.type === 'spelling' ? 'border-red-400 bg-red-50 dark:bg-red-500/15' : 
+                  issue.type === 'grammar' ? 'border-blue-400 bg-blue-50 dark:bg-blue-500/15' : 
+                  'border-amber-400 bg-amber-50 dark:bg-amber-500/15'
                 }`}
               >
                 {issue.original}
               </span>
             </TooltipTrigger>
-            <TooltipContent className="max-w-xs p-3 bg-white text-slate-900 border border-slate-200 shadow-xl">
+            <TooltipContent className="max-w-xs border border-border bg-popover p-3 text-popover-foreground shadow-xl">
               <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                   {issue.type}
                 </p>
                 <p className="text-sm font-medium leading-relaxed">{issue.message}</p>
                 {issue.replacement && (
                   <div className="mt-2 flex flex-col gap-2">
-                    <p className="text-xs text-slate-500 italic">Suggestion: <span className="font-bold text-green-600">&quot;{issue.replacement}&quot;</span></p>
+                    <p className="text-xs text-muted-foreground italic">Suggestion: <span className="font-bold text-green-600 dark:text-green-400">&quot;{issue.replacement}&quot;</span></p>
                     <Button 
                       size="sm" 
                       variant="outline" 
-                      className="h-7 text-[10px] uppercase font-bold text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                      className="h-7 border-blue-200 bg-blue-50 text-[10px] font-bold uppercase text-blue-700 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20"
                       onClick={() => applyFix(issue)}
                     >
                       Apply Fix
@@ -152,23 +152,23 @@ export default function GrammarPage() {
     : "";
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="container mx-auto max-w-7xl px-4 py-8">
         <header className="mb-8 flex items-center justify-between">
           <div>
             <Link href="/" className="mb-2 inline-block text-sm font-medium text-blue-600 hover:underline">
               ← Back to Home
             </Link>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Grammar Corrector</h1>
-            <p className="font-medium text-slate-500">Intelligent Writing Assistant</p>
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">Grammar Corrector</h1>
+            <p className="font-medium text-muted-foreground">Intelligent Writing Assistant</p>
           </div>
           <div className="flex items-center gap-4">
             {settings?.runningEnv !== "web" && (
-              <div className="flex overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+              <div className="flex overflow-hidden rounded-lg border border-border bg-card p-1 shadow-sm">
                 <button
                   onClick={() => setMode("online")}
                   className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
-                    mode === "online" ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
+                    mode === "online" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   <Sparkles className="h-3 w-3" /> Online
@@ -176,7 +176,7 @@ export default function GrammarPage() {
                 <button
                   onClick={() => setMode("offline")}
                   className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
-                    mode === "offline" ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:bg-slate-50"
+                    mode === "offline" ? "bg-primary text-primary-foreground shadow-md" : "text-muted-foreground hover:bg-muted"
                   }`}
                 >
                   <Zap className="h-3 w-3" /> Offline
@@ -195,8 +195,8 @@ export default function GrammarPage() {
         <main className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           {/* Left: Input */}
           <section className="space-y-4 lg:col-span-5">
-            <Card className="border-slate-200 p-6 shadow-sm">
-              <label className="mb-2 block text-sm font-bold uppercase tracking-wider text-slate-700">
+            <Card className="border-border p-6 shadow-sm">
+              <label className="mb-2 block text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Input English Text
               </label>
               <textarea
@@ -206,13 +206,13 @@ export default function GrammarPage() {
                   setResult(null);
                 }}
                 onKeyDown={handleKeyDown}
-                className="h-80 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 leading-relaxed text-slate-800 outline-none transition-all focus:bg-white focus:ring-2 focus:ring-blue-500"
+                className="h-80 w-full resize-none rounded-xl border border-input bg-input/30 p-4 leading-relaxed text-foreground outline-none transition-all placeholder:text-muted-foreground focus:bg-background focus:ring-2 focus:ring-blue-500"
                 placeholder="Paste your English text here. Press Shift+Enter to analyze..."
               ></textarea>
               <Button
                 onClick={handleCheck}
                 disabled={checkMutation.isPending || !text.trim()}
-                className="mt-6 w-full rounded-xl bg-slate-900 py-6 text-lg font-bold text-white shadow-lg transition-all hover:bg-slate-800 active:scale-[0.98]"
+                className="mt-6 w-full rounded-xl py-6 text-lg font-bold shadow-lg transition-all active:scale-[0.98]"
               >
                 {checkMutation.isPending ? "Analyzing..." : "Check Grammar"}
               </Button>
@@ -222,13 +222,13 @@ export default function GrammarPage() {
           {/* Right: Results */}
           <section className="lg:col-span-7">
             {result ? (
-              <Card className="flex h-[calc(100vh-250px)] flex-col border-slate-200 shadow-sm overflow-hidden bg-white">
+              <Card className="flex h-[calc(100vh-250px)] flex-col overflow-hidden border-border bg-card shadow-sm">
                 {/* Tabs Header */}
-                <div className="flex border-b border-slate-100 px-6">
+                <div className="flex border-b border-border px-6">
                   <button
                     onClick={() => setActiveTab("list")}
                     className={`flex items-center gap-2 px-6 py-4 text-sm font-bold uppercase tracking-widest transition-colors ${
-                      activeTab === "list" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+                      activeTab === "list" ? "border-b-2 border-blue-500 text-blue-400" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <List className="h-4 w-4" /> Issue List
@@ -236,7 +236,7 @@ export default function GrammarPage() {
                   <button
                     onClick={() => setActiveTab("preview")}
                     className={`flex items-center gap-2 px-6 py-4 text-sm font-bold uppercase tracking-widest transition-colors ${
-                      activeTab === "preview" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+                      activeTab === "preview" ? "border-b-2 border-blue-500 text-blue-400" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <Eye className="h-4 w-4" /> Live Preview
@@ -244,7 +244,7 @@ export default function GrammarPage() {
                   <button
                     onClick={() => setActiveTab("summary")}
                     className={`flex items-center gap-2 px-6 py-4 text-sm font-bold uppercase tracking-widest transition-colors ${
-                      activeTab === "summary" ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-400 hover:text-slate-600"
+                      activeTab === "summary" ? "border-b-2 border-blue-500 text-blue-400" : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     <BarChart3 className="h-4 w-4" /> Summary
@@ -257,24 +257,24 @@ export default function GrammarPage() {
                     <div className="space-y-4">
                       {result.issues.length > 0 ? (
                         result.issues.map((issue) => (
-                          <div key={issue.id} className="group relative rounded-xl border border-slate-100 bg-slate-50 p-5 transition-all hover:border-slate-200 hover:bg-white hover:shadow-md">
+                          <div key={issue.id} className="group relative rounded-xl border border-border bg-muted/30 p-5 transition-all hover:border-blue-500/30 hover:bg-muted/50 hover:shadow-md">
                             <div className="flex items-start justify-between gap-4">
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2">
                                   <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                    issue.type === 'spelling' ? 'bg-red-100 text-red-700' : 
-                                    issue.type === 'grammar' ? 'bg-blue-100 text-blue-700' : 
-                                    'bg-amber-100 text-amber-700'
+                                    issue.type === 'spelling' ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300' : 
+                                    issue.type === 'grammar' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 
+                                    'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
                                   }`}>
                                     {issue.type}
                                   </span>
-                                  <span className="text-xs font-medium text-slate-400">At index {issue.offset}</span>
+                                  <span className="text-xs font-medium text-muted-foreground">At index {issue.offset}</span>
                                 </div>
-                                <p className="text-base font-bold text-slate-800">
+                                <p className="text-base font-bold text-foreground">
                                   <span className="line-through opacity-40 mr-2">{issue.original}</span>
-                              {issue.replacement && <span className="text-green-600">→ {issue.replacement}</span>}
+                              {issue.replacement && <span className="text-green-600 dark:text-green-400">→ {issue.replacement}</span>}
                                 </p>
-                                <p className="text-sm text-slate-600">{issue.message}</p>
+                                <p className="text-sm text-muted-foreground">{issue.message}</p>
                               </div>
                               {issue.replacement && (
                                 <Button 
@@ -290,38 +290,38 @@ export default function GrammarPage() {
                       ) : (
                         <div className="flex h-full flex-col items-center justify-center py-20 text-center">
                           <CheckCircle2 className="mb-4 h-12 w-12 text-green-500" />
-                          <h3 className="text-xl font-bold text-slate-900">No issues found!</h3>
-                          <p className="text-slate-500">Your writing looks excellent.</p>
+                          <h3 className="text-xl font-bold text-foreground">No issues found!</h3>
+                          <p className="text-muted-foreground">Your writing looks excellent.</p>
                         </div>
                       )}
                     </div>
                   ) : activeTab === "preview" ? (
-                    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-8">
+                    <div className="rounded-2xl border border-border bg-muted/30 p-8">
                       {renderPreviewText()}
                     </div>
                   ) : (
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="flex flex-col items-center justify-center rounded-2xl border border-red-100 bg-red-50 p-8 text-red-700 shadow-sm">
+                        <div className="flex flex-col items-center justify-center rounded-2xl border border-red-100 bg-red-50 p-8 text-red-700 shadow-sm dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
                           <span className="text-5xl font-black">{result.stats.spelling}</span>
                           <span className="mt-2 text-xs font-bold uppercase tracking-widest opacity-70">Spelling Errors</span>
                         </div>
-                        <div className="flex flex-col items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 p-8 text-blue-700 shadow-sm">
+                        <div className="flex flex-col items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 p-8 text-blue-700 shadow-sm dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
                           <span className="text-5xl font-black">{result.stats.grammar}</span>
                           <span className="mt-2 text-xs font-bold uppercase tracking-widest opacity-70">Grammar Issues</span>
                         </div>
-                        <div className="flex flex-col items-center justify-center rounded-2xl border border-amber-100 bg-amber-50 p-8 text-amber-700 shadow-sm">
+                        <div className="flex flex-col items-center justify-center rounded-2xl border border-amber-100 bg-amber-50 p-8 text-amber-700 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
                           <span className="text-5xl font-black">{result.stats.style}</span>
                           <span className="mt-2 text-xs font-bold uppercase tracking-widest opacity-70">Style Suggestions</span>
                         </div>
                       </div>
                       
-                      <div className="rounded-2xl border border-slate-100 bg-slate-900 p-8 text-white">
-                        <h4 className="mb-4 text-sm font-bold uppercase tracking-widest text-slate-400">Analysis Result</h4>
+                      <div className="rounded-2xl border border-border bg-background p-8 text-foreground">
+                        <h4 className="mb-4 text-sm font-bold uppercase tracking-widest text-muted-foreground">Analysis Result</h4>
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-3xl font-bold">{summaryTitle}</p>
-                            <p className="mt-1 text-slate-400">Overall text quality needs {qualityNeed} improvement.</p>
+                            <p className="mt-1 text-muted-foreground">Overall text quality needs {qualityNeed} improvement.</p>
                           </div>
                           <CheckCircle2 className={`h-12 w-12 ${result.stats.total === 0 ? "text-green-400" : "text-slate-600"}`} />
                         </div>
@@ -331,12 +331,12 @@ export default function GrammarPage() {
                 </div>
               </Card>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-100/50 p-12">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-200">
-                  <AlertCircle className="h-8 w-8 text-slate-400" />
+              <div className="flex h-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted/20 p-12">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                  <AlertCircle className="h-8 w-8 text-muted-foreground" />
                 </div>
-                <p className="font-medium text-slate-400">Awaiting input for grammar analysis...</p>
-                <p className="mt-2 text-sm text-slate-400">Paste your text and click &quot;Check Grammar&quot; to begin.</p>
+                <p className="font-medium text-muted-foreground">Awaiting input for grammar analysis...</p>
+                <p className="mt-2 text-sm text-muted-foreground">Paste your text and click &quot;Check Grammar&quot; to begin.</p>
               </div>
             )}
           </section>
