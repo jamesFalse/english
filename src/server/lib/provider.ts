@@ -17,7 +17,7 @@ const deepseek = env.DEEPSEEK_API_KEY
     })
   : null;
 
-export type GeminiModel = "gemini-3-flash-preview";
+export type GeminiModel = "gemini-3.1-flash-lite";
 export type DeepSeekModel = "deepseek-v4-pro";
 export type ProviderModel = GeminiModel | DeepSeekModel;
 export type AIProvider = "gemini" | "deepseek";
@@ -48,7 +48,7 @@ const callGeminiProvider = async (prompt: string, options: ProviderOptions) => {
   if (!gemini) throw new Error("Gemini client is not configured");
 
   const response = await gemini.models.generateContent({
-    model: options.model === "gemini-3-flash-preview" ? options.model : "gemini-3-flash-preview",
+    model: options.model === "gemini-3.1-flash-lite" ? options.model : "gemini-3.1-flash-lite",
     contents: prompt,
     config: {
       systemInstruction: options.systemInstruction,
@@ -102,9 +102,9 @@ export async function callProvider(prompt: string, options: ProviderOptions = {}
       ? options.model === "deepseek-v4-pro"
         ? options.model
         : "deepseek-v4-pro"
-      : options.model === "gemini-3-flash-preview"
+      : options.model === "gemini-3.1-flash-lite"
         ? options.model
-        : "gemini-3-flash-preview";
+        : "gemini-3.1-flash-lite";
 
   try {
     const text =

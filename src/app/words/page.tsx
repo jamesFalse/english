@@ -18,7 +18,7 @@ export default async function WordsPage() {
           </Link>
         </header>
         
-        <div className="flex-1 overflow-hidden px-4 pb-6 w-full max-w-7xl mx-auto">
+        <div className="flex-1 overflow-hidden px-4 pb-6 w-full max-w-[1600px] mx-auto">
           <WordSelection />
         </div>
       </main>

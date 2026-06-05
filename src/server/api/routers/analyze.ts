@@ -67,7 +67,7 @@ export const analyzeRouter = createTRPCRouter({
     .input(z.object({ text: z.string().min(1) }))
     .mutation(async ({ input }) => {
       const result = await callProvider(input.text, {
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-flash-lite",
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
       });

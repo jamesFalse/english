@@ -365,4 +365,35 @@ export const wordRouter = createTRPCRouter({
 
       return { success: true, count: result.count };
     }),
+
+  explainContext: publicProcedure
+    .input(
+      z.object({
+        word: z.string().min(1),
+        story: z.string().min(1),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { word, story } = input;
+      const prompt = `
+        You are an expert English teacher. 
+        A student is reading the following story and needs an explanation for the word or phrase: "${word}".
+        
+        STORY:
+        """
+        ${story}
+        """
+        
+        TASK:
+        1. Explain the meaning of "${word}" specifically as it is used in the context of this story.
+        2. Provide your explanation in clear, simple English.
+        3. If it's a phrase or has a specific connotation in this text, highlight that.
+        4. Keep the explanation concise but thorough (approx 2-4 sentences).
+        5. Output ONLY the explanation text. No conversational filler.
+      `;
+
+      return callProvider(prompt, {
+        systemInstruction: "You are a helpful and professional English language tutor specializing in contextual definitions."
+      });
+    }),
 });

@@ -127,6 +127,12 @@
   body {
     @apply bg-background text-foreground;
   }
+  ::selection {
+    @apply bg-blue-200 text-slate-950;
+  }
+  .dark ::selection {
+    @apply bg-blue-400/70 text-white;
+  }
   html {
     @apply font-sans;
     color-scheme: light;

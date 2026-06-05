@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Volume2, Loader2, BookOpen, CheckCircle2, RotateCcw, Save, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
+import { Volume2, Loader2, BookOpen, CheckCircle2, RotateCcw, Save, ChevronDown, ChevronUp, Settings2, HelpCircle, X, Sparkles } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Rating } from "ts-fsrs";
 
@@ -114,19 +114,36 @@ const ratingLabels: Record<number, string> = {
 
 export function WordSelection() {
   const [quotas, setQuotas] = useState<WordQuotas>({ reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 5 });
-  const [isConfigOpen, setIsConfigOpen] = useState(true);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [words, setWords] = useState<SelectedWord[]>([]);
   const [selectionStats, setSelectionStats] = useState<SelectionStats | null>(null);
   const [difficulty, setDifficulty] = useState<CefrLevel>("B1");
   const [theme, setTheme] = useState("General");
   const [story, setStory] = useState("");
+  const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
 
   // New States for Batching and Undo
   const [pendingRatings, setPendingRatings] = useState<Record<number, ReviewRating>>({});
   const [syncedIds, setSyncedIds] = useState<Set<number>>(new Set());
 
   // Floating UI State
-  const [floatingMenu, setFloatingMenu] = useState<{ x: number, y: number, wordId: number } | null>(null);
+  const [floatingMenu, setFloatingMenu] = useState<{ x: number, y: number, wordId: number, text: string } | null>(null);
+  const [selectionMenu, setSelectionMenu] = useState<{ x: number, y: number, text: string } | null>(null);
+
+  // Explanation State
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [explanationWord, setExplanationWord] = useState<string | null>(null);
+
+  const storyRef = useRef<HTMLDivElement>(null);
+  const selectionMenuTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (selectionMenuTimerRef.current !== null) {
+        window.clearTimeout(selectionMenuTimerRef.current);
+      }
+    };
+  }, []);
 
   const generateQuery = api.word.generateSelection.useQuery(
     quotas,
@@ -137,9 +154,20 @@ export function WordSelection() {
     onSuccess: (data) => {
       setStory(data);
       localStorage.setItem("currentStory", data);
+      setExplanation(null);
+      setExplanationWord(null);
     },
     onError: (error) => {
       alert(`AI Story Generation Failed: ${error.message}`);
+    },
+  });
+
+  const explainMutation = api.word.explainContext.useMutation({
+    onSuccess: (data) => {
+      setExplanation(data);
+    },
+    onError: (error) => {
+      alert(`Explanation failed: ${error.message}`);
     },
   });
 
@@ -191,58 +219,65 @@ export function WordSelection() {
     if (savedQuotas) {
       try { 
         setQuotas(parseQuotas(parseJson(savedQuotas)));
-        setIsConfigOpen(false); 
       } catch (e) { console.error(e); }
     }
     if (savedTheme) {
       setTheme(savedTheme);
     }
+    setHasLoadedStorage(true);
   }, []);
 
   useEffect(() => {
+    if (!hasLoadedStorage) return;
     localStorage.setItem("currentTheme", theme);
-  }, [theme]);
+  }, [hasLoadedStorage, theme]);
 
   // Sync states to localStorage
   useEffect(() => {
+    if (!hasLoadedStorage) return;
     localStorage.setItem("wordQuotas", JSON.stringify(quotas));
-  }, [quotas]);
+  }, [hasLoadedStorage, quotas]);
 
   useEffect(() => {
+    if (!hasLoadedStorage) return;
     if (Object.keys(pendingRatings).length > 0) {
       localStorage.setItem("pendingRatings", JSON.stringify(pendingRatings));
     } else {
       localStorage.removeItem("pendingRatings");
     }
-  }, [pendingRatings]);
+  }, [hasLoadedStorage, pendingRatings]);
 
   useEffect(() => {
+    if (!hasLoadedStorage) return;
     if (words.length > 0) {
       localStorage.setItem("currentWords", JSON.stringify(words));
     } else {
       localStorage.removeItem("currentWords");
     }
-  }, [words]);
+  }, [hasLoadedStorage, words]);
 
   useEffect(() => {
+    if (!hasLoadedStorage) return;
     if (selectionStats) {
       localStorage.setItem("currentSelectionStats", JSON.stringify(selectionStats));
     } else {
       localStorage.removeItem("currentSelectionStats");
     }
-  }, [selectionStats]);
+  }, [hasLoadedStorage, selectionStats]);
 
   useEffect(() => {
+    if (!hasLoadedStorage) return;
     localStorage.setItem("syncedIds", JSON.stringify(Array.from(syncedIds)));
-  }, [syncedIds]);
+  }, [hasLoadedStorage, syncedIds]);
 
   useEffect(() => {
+    if (!hasLoadedStorage) return;
     if (story) {
       localStorage.setItem("currentStory", story);
     } else {
       localStorage.removeItem("currentStory");
     }
-  }, [story]);
+  }, [hasLoadedStorage, story]);
 
   const handleGenerate = async () => {
     const totalRequested = quotas.reviewCount + quotas.basicCount + quotas.independentCount + quotas.proficientCount;
@@ -259,6 +294,8 @@ export function WordSelection() {
       setStory("");
       setPendingRatings({});
       setSyncedIds(new Set());
+      setExplanation(null);
+      setExplanationWord(null);
       localStorage.removeItem("pendingRatings");
       localStorage.removeItem("currentWords");
       localStorage.removeItem("currentSelectionStats");
@@ -287,26 +324,88 @@ export function WordSelection() {
     setFloatingMenu(null);
   };
 
-  const handleStoryClick = (e: React.MouseEvent) => {
+  const handleExplain = (text: string) => {
+    if (!story) return;
+    setExplanation(null);
+    setExplanationWord(text);
+    explainMutation.mutate({ word: text, story });
+    setFloatingMenu(null);
+    setSelectionMenu(null);
+  };
+
+  const openWordMenu = (e: React.MouseEvent) => {
+    if (window.getSelection()?.toString().trim()) {
+      return false;
+    }
+
     const target = e.target as HTMLElement;
-    const mark = target.closest("mark");
+    const mark = target.closest("mark[data-word]");
     
-    if (mark) {
+    if (mark && storyRef.current?.contains(mark)) {
       const baseWord = mark.getAttribute("data-word");
       if (baseWord) {
         const wordMatch = words.find(w => w.text.toLowerCase() === baseWord.toLowerCase());
-        if (wordMatch && !syncedIds.has(wordMatch.id)) {
+        if (wordMatch) {
+          e.preventDefault();
+          e.stopPropagation();
           setFloatingMenu({
             x: e.clientX,
             y: e.clientY,
-            wordId: wordMatch.id
+            wordId: wordMatch.id,
+            text: wordMatch.text
           });
+          setSelectionMenu(null);
           playTTS(wordMatch.text);
-          return;
+          return true;
         }
       }
     }
+    return false;
+  };
+
+  const handleStoryClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const activeSelection = window.getSelection()?.toString().trim();
+
+    if (activeSelection) {
+      return;
+    }
+
+    if (openWordMenu(e)) {
+      return;
+    }
+
     setFloatingMenu(null);
+    setSelectionMenu(null);
+  };
+
+  const handleStoryMouseUp = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (selectionMenuTimerRef.current !== null) {
+      window.clearTimeout(selectionMenuTimerRef.current);
+    }
+    
+    selectionMenuTimerRef.current = window.setTimeout(() => {
+      selectionMenuTimerRef.current = null;
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+      
+      if (text && text.length > 0 && text.length <= 300 && selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const rect = range?.getBoundingClientRect();
+        if (!rect) return;
+
+        setSelectionMenu({
+          x: rect.left + rect.width / 2,
+          y: rect.top,
+          text,
+        });
+        setFloatingMenu(null);
+        return;
+      }
+
+      setSelectionMenu(null);
+    }, 0);
   };
 
   const handleBatchSubmit = async () => {
@@ -399,130 +498,130 @@ export function WordSelection() {
   };
 
   return (
-    <div className="w-full h-full grid grid-cols-1 lg:grid-cols-2 gap-8 overflow-hidden items-start" onClick={() => floatingMenu && setFloatingMenu(null)}>
-      <div className="h-full overflow-y-auto pr-2 space-y-6 pb-8">
-        <Card className="shadow-md border-2 border-muted/50 overflow-hidden">
-          <CardHeader 
-            className="pb-4 flex flex-row items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors py-3"
-            onClick={() => setIsConfigOpen(!isConfigOpen)}
-          >
-            <div className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg font-bold">Word Selection Config</CardTitle>
-            </div>
-            {isConfigOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-          </CardHeader>
-          
-          <div className={`transition-all duration-300 ease-in-out ${isConfigOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"}`}>
-            <CardContent className="pt-2 pb-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="space-y-1.5">
-                  <label htmlFor="quota-review" className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Review</label>
-                  <Input
-                    id="quota-review"
-                    type="number"
-                    value={quotas.reviewCount}
-                    onChange={(e) => setQuotas({ ...quotas, reviewCount: Number(e.target.value) })}
-                    className="h-9 font-bold border-orange-200 focus-visible:ring-orange-500 px-2"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="quota-basic" className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Basic (A1/2)</label>
-                  <Input
-                    id="quota-basic"
-                    type="number"
-                    value={quotas.basicCount}
-                    onChange={(e) => setQuotas({ ...quotas, basicCount: Number(e.target.value) })}
-                    className="h-9 font-bold border-green-200 focus-visible:ring-green-500 px-2"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="quota-independent" className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Indep. (B1/2)</label>
-                  <Input
-                    id="quota-independent"
-                    type="number"
-                    value={quotas.independentCount}
-                    onChange={(e) => setQuotas({ ...quotas, independentCount: Number(e.target.value) })}
-                    className="h-9 font-bold border-blue-200 focus-visible:ring-blue-500 px-2"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label htmlFor="quota-proficient" className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Profic. (C1/2)</label>
-                  <Input
-                    id="quota-proficient"
-                    type="number"
-                    value={quotas.proficientCount}
-                    onChange={(e) => setQuotas({ ...quotas, proficientCount: Number(e.target.value) })}
-                    className="h-9 font-bold border-purple-200 focus-visible:ring-purple-500 px-2"
-                  />
-                </div>
+    <div className="w-full h-full flex flex-col lg:flex-row gap-8 overflow-hidden items-stretch" onClick={() => {
+      setFloatingMenu(null);
+      setSelectionMenu(null);
+    }}>
+      {/* Left Column: Word Selection & List */}
+      <div className="flex flex-col h-full lg:w-1/2 min-w-0">
+        <div className="flex-none space-y-4 mb-4">
+          <Card className="shadow-md border-2 border-muted/50 overflow-hidden">
+            <CardHeader 
+              className="pb-4 flex flex-row items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors py-3"
+              onClick={() => setIsConfigOpen(!isConfigOpen)}
+            >
+              <div className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg font-bold">Selection Config</CardTitle>
               </div>
+              {isConfigOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+            </CardHeader>
+            
+            <div className={`transition-all duration-300 ease-in-out ${isConfigOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"}`}>
+              <CardContent className="pt-2 pb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1.5">
+                    <label htmlFor="quota-review" className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Review</label>
+                    <Input
+                      id="quota-review"
+                      type="number"
+                      value={quotas.reviewCount}
+                      onChange={(e) => setQuotas({ ...quotas, reviewCount: Number(e.target.value) })}
+                      className="h-9 font-bold border-orange-200 focus-visible:ring-orange-500 px-2"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="quota-basic" className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Basic (A1/2)</label>
+                    <Input
+                      id="quota-basic"
+                      type="number"
+                      value={quotas.basicCount}
+                      onChange={(e) => setQuotas({ ...quotas, basicCount: Number(e.target.value) })}
+                      className="h-9 font-bold border-green-200 focus-visible:ring-green-500 px-2"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="quota-independent" className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Indep. (B1/2)</label>
+                    <Input
+                      id="quota-independent"
+                      type="number"
+                      value={quotas.independentCount}
+                      onChange={(e) => setQuotas({ ...quotas, independentCount: Number(e.target.value) })}
+                      className="h-9 font-bold border-blue-200 focus-visible:ring-blue-500 px-2"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="quota-proficient" className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Profic. (C1/2)</label>
+                    <Input
+                      id="quota-proficient"
+                      type="number"
+                      value={quotas.proficientCount}
+                      onChange={(e) => setQuotas({ ...quotas, proficientCount: Number(e.target.value) })}
+                      className="h-9 font-bold border-purple-200 focus-visible:ring-purple-500 px-2"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </div>
+          </Card>
 
-            </CardContent>
+          <div className="flex flex-col gap-3">
+            {!allSynced && !hasPending && (
+              <Button
+                className="w-full h-11 text-sm font-bold shadow-md"
+                onClick={handleGenerate}
+                disabled={generateQuery.isFetching}
+              >
+                {generateQuery.isFetching ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                )}
+                {words.length > 0 ? "Regenerate Word List" : "Generate Words to Start"}
+              </Button>
+            )}
+
+            {allSynced ? (
+              <Button
+                className="h-11 w-full border border-emerald-500/30 bg-emerald-500/15 text-sm font-bold text-emerald-700 shadow-md shadow-emerald-950/10 hover:bg-emerald-500/25 dark:text-emerald-300"
+                onClick={handleGenerate}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Everything Synced! Start Next Story
+              </Button>
+            ) : hasPending && (
+              <Button
+                className="w-full h-11 text-sm font-bold shadow-md bg-blue-600 hover:bg-blue-700"
+                onClick={handleBatchSubmit}
+                disabled={submitBatchReviewMutation.isPending}
+              >
+                {submitBatchReviewMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Sync Progress ({Object.keys(pendingRatings).length} words)
+              </Button>
+            )}
+
+            {selectionStats && (
+              <div className="grid grid-cols-4 gap-2">
+                {selectionStatItems.map((item) => (
+                  <div key={item.label} className={`rounded-md border p-2 ${item.className}`}>
+                    <div className="text-[9px] font-black uppercase tracking-wider opacity-75">{item.label}</div>
+                    <div className="flex items-end gap-1">
+                      <span className="text-lg font-black leading-none">{item.value}</span>
+                      <span className="text-[9px] font-bold opacity-60">/ {item.requested}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </Card>
-
-        <div className="flex flex-col gap-4">
-          {!allSynced && !hasPending && (
-            <Button
-              className="w-full h-12 text-base font-bold shadow-md"
-              onClick={handleGenerate}
-              disabled={generateQuery.isFetching}
-            >
-              {generateQuery.isFetching ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <RotateCcw className="mr-2 h-5 w-5" />
-              )}
-              {words.length > 0 ? "Regenerate Word List" : "Generate Words to Start"}
-            </Button>
-          )}
-
-          {allSynced ? (
-            <Button
-              className="w-full h-12 text-base font-bold shadow-md bg-green-600 hover:bg-green-700"
-              onClick={handleGenerate}
-            >
-              <RotateCcw className="mr-2 h-5 w-5" />
-              Everything Synced! Start Next Story
-            </Button>
-          ) : hasPending && (
-            <Button
-              className="w-full h-12 text-base font-bold shadow-md bg-blue-600 hover:bg-blue-700"
-              onClick={handleBatchSubmit}
-              disabled={submitBatchReviewMutation.isPending}
-            >
-              {submitBatchReviewMutation.isPending ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-5 w-5" />
-              )}
-              Sync Progress ({Object.keys(pendingRatings).length} words)
-            </Button>
-          )}
         </div>
 
-        {selectionStats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {selectionStatItems.map((item) => (
-              <div key={item.label} className={`rounded-lg border p-3 ${item.className}`}>
-                <div className="text-[10px] font-black uppercase tracking-wider opacity-75">{item.label}</div>
-                <div className="mt-1 flex items-end gap-1">
-                  <span className="text-2xl font-black leading-none">{item.value}</span>
-                  <span className="text-xs font-bold opacity-60">/ {item.requested}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {words.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-                Word List ({syncedIds.size}/{words.length} synced)
-              </h3>
-            </div>
+        <div className="flex-1 overflow-y-auto pr-2 pb-8 space-y-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+          {words.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {words.map((word) => {
                 const isSynced = syncedIds.has(word.id);
@@ -613,116 +712,177 @@ export function WordSelection() {
                 );
               })}
             </div>
-          </div>
-        )}
+          ) : (
+            <Card className="h-full bg-muted/30 border-dashed flex flex-col items-center justify-center p-12 text-center">
+              <div className="max-w-xs space-y-4">
+                <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Loader2 className="h-8 w-8 text-muted-foreground opacity-50" />
+                </div>
+                <p className="text-lg font-semibold text-muted-foreground">No words loaded</p>
+                <p className="text-sm text-muted-foreground/70">
+                  Choose your difficulty quotas above and generate a word list to start.
+                </p>
+              </div>
+            </Card>
+          )}
+        </div>
       </div>
 
-      <div className="h-full overflow-y-auto pr-4 pb-8 relative">
+      {/* Right Column: AI Story & Explanation */}
+      <div className="flex flex-col h-full lg:w-1/2 min-w-0 relative">
+        {/* Floating Menus (fixed to screen, context-aware) */}
         {floatingMenu && (
           <div 
-            className="fixed z-[100] bg-popover border shadow-2xl rounded-xl p-2 grid grid-cols-4 gap-1 animate-in fade-in zoom-in duration-200"
-            style={{ left: floatingMenu.x - 80, top: floatingMenu.y - 60 }}
+            className="fixed z-[100] bg-popover border shadow-2xl rounded-xl p-2 flex flex-col gap-2 animate-in fade-in zoom-in duration-200 min-w-[200px]"
+            style={{ left: Math.min(window.innerWidth - 220, floatingMenu.x), top: floatingMenu.y - 120 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Again)}>Again</Button>
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-orange-700 hover:bg-orange-50 dark:text-orange-300 dark:hover:bg-orange-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Hard)}>Hard</Button>
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Good)}>Good</Button>
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Easy)}>Easy</Button>
+            <div className="flex items-center justify-between px-2 py-1 border-b">
+              <span className="text-xs font-bold truncate max-w-[120px]">{floatingMenu.text}</span>
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setFloatingMenu(null)}>
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Again)}>Again</Button>
+              <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-orange-700 hover:bg-orange-50 dark:text-orange-300 dark:hover:bg-orange-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Hard)}>Hard</Button>
+              <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-green-700 hover:bg-green-50 dark:text-green-300 dark:hover:bg-green-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Good)}>Good</Button>
+              <Button size="sm" variant="ghost" className="h-8 px-2 text-[10px] font-bold text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-blue-500/10" onClick={() => handleReview(floatingMenu.wordId, Rating.Easy)}>Easy</Button>
+            </div>
+            <Button 
+              size="sm" 
+              className="w-full h-8 text-xs font-bold gap-2" 
+              onClick={() => handleExplain(floatingMenu.text)}
+              disabled={explainMutation.isPending}
+            >
+              {explainMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <HelpCircle className="h-3 w-3" />}
+              Explain in Context
+            </Button>
           </div>
         )}
 
-        {words.length > 0 ? (
-          <Card className="shadow-sm border-2 border-muted overflow-visible pt-0">
-            <CardHeader className="bg-muted/50 border-b py-4">
-              <CardTitle className="flex items-center gap-2 text-lg font-bold text-foreground">
-                <BookOpen className="h-5 w-5 text-primary" />
-                AI Story Practice
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-5 space-y-6">
-              <div className="flex flex-col gap-4 bg-muted/20 p-4 rounded-lg border border-muted/50">
-                <div className="grid grid-cols-2 gap-4 w-full">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Story Level</label>
-                    <Select value={difficulty} onValueChange={(val) => {
-                      if (typeof val === "string" && isCefrLevel(val)) setDifficulty(val);
-                    }}>
-                      <SelectTrigger className="h-9 bg-background shadow-sm border-muted-foreground/20">
-                        <SelectValue placeholder="Select difficulty" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CEFR_LEVELS.map((level) => (
-                          <SelectItem key={level} value={level}>
-                            {level} - {level.startsWith("A") ? "Basic" : level.startsWith("B") ? "Intermediate" : "Advanced"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Story Theme</label>
-                    <Select value={theme} onValueChange={(val) => val && setTheme(val)}>
-                      <SelectTrigger className="h-9 bg-background shadow-sm border-muted-foreground/20">
-                        <SelectValue placeholder="Select theme" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {["General", "Work & Career", "Daily Life", "Travel", "Science & Tech", "Mystery & Story"].map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleGenerateStory}
-                  disabled={generateStoryMutation.isPending || unratedWords.length === 0}
-                  className="bg-primary hover:bg-primary/90 h-10 w-full font-bold shadow-sm"
-                >
-                  {generateStoryMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <BookOpen className="mr-2 h-4 w-4" />
-                  )}
-                  {unratedWords.length > 0 ? `Generate ${theme} Story (${unratedWords.length} words)` : "All Reviewed"}
-                </Button>
-              </div>
+        {selectionMenu && (
+          <div 
+            className="fixed z-[100] rounded-lg border bg-popover p-1 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200"
+            style={{
+              left: selectionMenu.x,
+              top: Math.max(12, selectionMenu.y - 44),
+              transform: "translateX(-50%)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button 
+              size="sm" 
+              className="h-8 px-3 text-xs font-bold gap-2 shadow-lg" 
+              onClick={() => handleExplain(selectionMenu.text)}
+              disabled={explainMutation.isPending}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
+              Explain Selection
+            </Button>
+          </div>
+        )}
 
-              {story && (
-                <div 
-                  className="mt-4 p-6 bg-background rounded-lg border border-muted shadow-sm prose prose-slate max-w-none overflow-visible cursor-default select-none"
-                  onClick={handleStoryClick}
-                >
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html: processedStory()
-                    }}
-                    className="[&>mark]:rounded [&>mark]:border-b-2 [&>mark]:border-indigo-300/40 [&>mark]:bg-indigo-100/70 [&>mark]:px-1 [&>mark]:py-0.5 [&>mark]:font-bold [&>mark]:text-indigo-900 [&>mark]:transition-all [&>mark]:duration-300 [&>mark]:cursor-pointer hover:[&>mark]:bg-indigo-200/80 dark:[&>mark]:bg-indigo-400/20 dark:[&>mark]:text-indigo-100 dark:hover:[&>mark]:bg-indigo-400/35 [&>mark[data-rated='true']]:cursor-default [&>mark[data-rated='true']]:opacity-40 [&>mark[data-rated='true']]:grayscale [&>u]:cursor-help [&>u]:decoration-blue-400/50 [&>u]:decoration-dashed [&>u]:underline-offset-4 font-sans text-base leading-relaxed text-foreground md:text-lg"
-                  />
-                </div>
-              )}
-
-              {!story && !generateStoryMutation.isPending && (
-                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-muted/5 rounded-lg border-2 border-dashed border-muted">
-                  <BookOpen className="h-12 w-12 opacity-20 mb-4" />
-                  <p className="text-base font-semibold">Your story will appear here</p>
-                  <p className="text-sm opacity-70">Generate a story to practice your selected words</p>
-                </div>
-              )}
+        {/* Story Controls - Pinned at top of column */}
+        <div className="flex-none mb-4">
+          <Card className="overflow-visible border border-border bg-card/80 shadow-sm">
+            <CardContent className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-[1fr_1fr_auto]">
+                <Select value={difficulty} onValueChange={(val) => {
+                  if (typeof val === "string" && isCefrLevel(val)) setDifficulty(val);
+                }}>
+                  <SelectTrigger className="h-9 w-full border-muted-foreground/20 bg-background shadow-sm">
+                    <SelectValue placeholder="Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CEFR_LEVELS.map((level) => (
+                      <SelectItem key={level} value={level}>{level}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={theme} onValueChange={(val) => val && setTheme(val)}>
+                  <SelectTrigger className="h-9 w-full border-muted-foreground/20 bg-background shadow-sm">
+                    <SelectValue placeholder="Theme" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["General", "Work & Career", "Daily Life", "Travel", "Science & Tech", "Mystery & Story"].map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              <Button
+                onClick={handleGenerateStory}
+                disabled={generateStoryMutation.isPending || unratedWords.length === 0}
+                className="h-9 min-w-[168px] whitespace-nowrap px-4 font-bold shadow-sm"
+              >
+                {generateStoryMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpen className="mr-2 h-4 w-4" />}
+                Generate Story ({unratedWords.length})
+              </Button>
             </CardContent>
           </Card>
-        ) : (
-          <Card className="h-full bg-muted/30 border-dashed flex flex-col items-center justify-center p-12 text-center">
-            <div className="max-w-xs space-y-4">
-              <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                <Loader2 className="h-8 w-8 text-muted-foreground opacity-50" />
-              </div>
-              <p className="text-lg font-semibold text-muted-foreground">No words loaded</p>
-              <p className="text-sm text-muted-foreground/70">
-                Choose your difficulty quotas on the left and generate a word list to start.
-              </p>
+        </div>
+
+        {/* Story Content & Explanation - Scrollable area */}
+        <div className="flex-1 overflow-y-auto pr-4 pb-8 space-y-6 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+          {story ? (
+            <div 
+              ref={storyRef}
+              className="relative cursor-text select-text overflow-visible rounded-lg border border-muted bg-background p-6 shadow-sm selection:bg-blue-200 selection:text-slate-950 dark:selection:bg-blue-400/70 dark:selection:text-white prose prose-slate max-w-none"
+              onClick={(e) => {
+                handleStoryClick(e);
+              }}
+              onMouseUp={handleStoryMouseUp}
+            >
+              <div
+                dangerouslySetInnerHTML={{ __html: processedStory() }}
+                className="[&>mark]:rounded [&>mark]:border-b-2 [&>mark]:border-indigo-300/40 [&>mark]:bg-indigo-100/70 [&>mark]:px-1 [&>mark]:py-0.5 [&>mark]:font-bold [&>mark]:text-indigo-900 [&>mark]:transition-all [&>mark]:duration-300 [&>mark]:cursor-pointer hover:[&>mark]:bg-indigo-200/80 dark:[&>mark]:bg-indigo-400/20 dark:[&>mark]:text-indigo-100 dark:hover:[&>mark]:bg-indigo-400/35 [&>mark[data-rated='true']]:cursor-default [&>mark[data-rated='true']]:opacity-40 [&>mark[data-rated='true']]:grayscale [&>u]:cursor-help [&>u]:decoration-blue-400/50 [&>u]:decoration-dashed [&>u]:underline-offset-4 font-sans text-base leading-relaxed text-foreground md:text-lg"
+              />
             </div>
-          </Card>
-        )}
+          ) : !generateStoryMutation.isPending && (
+            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground bg-muted/5 rounded-lg border-2 border-dashed border-muted">
+              <BookOpen className="h-12 w-12 opacity-20 mb-4" />
+              <p className="text-base font-semibold">Your story will appear here</p>
+            </div>
+          )}
+
+          {(explanation || explainMutation.isPending) && (
+            <Card id="explanation-section" className="shadow-lg border-2 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden">
+              <CardHeader className="bg-primary/10 py-3 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-base font-bold text-primary">Contextual Explanation</CardTitle>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => {
+                  setExplanation(null);
+                  setExplanationWord(null);
+                }}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent className="p-5">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black uppercase text-muted-foreground tracking-widest">Explaining:</span>
+                    <span className="text-lg font-bold text-foreground bg-background px-3 py-1 rounded-md border shadow-sm">
+                      {explanationWord}
+                    </span>
+                  </div>
+                  <div className="relative min-h-[60px] bg-background p-4 rounded-lg border-2 border-primary/10 shadow-inner">
+                    {explainMutation.isPending ? (
+                      <div className="flex flex-col items-center justify-center py-4 gap-2">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <p className="text-xs font-medium text-muted-foreground animate-pulse">Consulting AI Linguist...</p>
+                      </div>
+                    ) : (
+                      <p className="text-base leading-relaxed text-foreground font-medium italic">
+                        "{explanation}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );

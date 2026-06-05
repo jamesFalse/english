@@ -7,7 +7,9 @@ An AI-powered English toolset built with the T3 Stack, designed to master vocabu
 ### 1. Vocabulary Builder (FSRS)
 - **Scientific Spaced Repetition**: Powered by the [FSRS](https://github.com/open-spaced-repetition/ts-fsrs) algorithm to optimize memory retention.
 - **AI-Generated Contextual Stories**: Uses **Gemini 3 Flash** to weave your daily vocabulary into engaging stories.
-- **Batch Review**: Efficiently rate word recall difficulty (Again, Hard, Good, Easy) after immersion.
+- **AI Contextual Explanation**: Instant, context-aware English definitions for words and selected phrases within stories. Supports arbitary text selection for deep dives.
+- **Batch Review & Sync**: Efficiently rate word recall difficulty (Again, Hard, Good, Easy) and sync progress in one click.
+- **Desktop-Grade UI**: Pinned configuration panels, split-pane independent scrolling, and 1600px wide-screen support for a focused experience.
 
 ### 2. Logic Flow Analyzer
 - **Cognitive Parsing**: Deconstructs complex sentences into "Native Speaker" mental chunks.
