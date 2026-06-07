@@ -443,6 +443,7 @@ export function WordSelection() {
 
   const allSynced = words.length > 0 && syncedIds.size === words.length;
   const hasPending = Object.keys(pendingRatings).length > 0;
+  const showExplanationPanel = explainMutation.isPending ? true : explanation !== null;
   const selectionStatItems = selectionStats
     ? [
         { label: "Review", value: selectionStats.review, requested: quotas.reviewCount, className: "text-orange-700 bg-orange-50 border-orange-100 dark:text-orange-300 dark:bg-orange-500/10 dark:border-orange-500/20" },
@@ -844,7 +845,7 @@ export function WordSelection() {
             </div>
           )}
 
-          {(explanation || explainMutation.isPending) && (
+          {showExplanationPanel && (
             <Card id="explanation-section" className="shadow-lg border-2 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden">
               <CardHeader className="bg-primary/10 py-3 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -874,7 +875,7 @@ export function WordSelection() {
                       </div>
                     ) : (
                       <p className="text-base leading-relaxed text-foreground font-medium italic">
-                        "{explanation}"
+                        {explanation}
                       </p>
                     )}
                   </div>
