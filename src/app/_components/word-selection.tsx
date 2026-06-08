@@ -87,7 +87,7 @@ const parseNumberArray = (value: unknown): number[] =>
   Array.isArray(value) ? value.filter((item): item is number => typeof item === "number") : [];
 
 const parseQuotas = (value: unknown): WordQuotas => {
-  const fallback = { reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 5 };
+  const fallback = { reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 1 };
   if (!isRecord(value)) return fallback;
 
   return {
@@ -113,7 +113,7 @@ const ratingLabels: Record<number, string> = {
 };
 
 export function WordSelection() {
-  const [quotas, setQuotas] = useState<WordQuotas>({ reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 5 });
+  const [quotas, setQuotas] = useState<WordQuotas>({ reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 1 });
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [words, setWords] = useState<SelectedWord[]>([]);
   const [selectionStats, setSelectionStats] = useState<SelectionStats | null>(null);
@@ -279,12 +279,33 @@ export function WordSelection() {
     }
   }, [hasLoadedStorage, story]);
 
-  const handleGenerate = async () => {
+  const clearGeneratedPractice = () => {
+    setWords([]);
+    setSelectionStats(null);
+    setStory("");
+    setPendingRatings({});
+    setSyncedIds(new Set());
+    setExplanation(null);
+    setExplanationWord(null);
+    setFloatingMenu(null);
+    setSelectionMenu(null);
+    localStorage.removeItem("pendingRatings");
+    localStorage.removeItem("currentWords");
+    localStorage.removeItem("currentSelectionStats");
+    localStorage.removeItem("syncedIds");
+    localStorage.removeItem("currentStory");
+  };
+
+  const generateWords = async (clearExisting: boolean) => {
     const totalRequested = quotas.reviewCount + quotas.basicCount + quotas.independentCount + quotas.proficientCount;
     if (totalRequested <= 0) {
       alert("Please set at least one word count to greater than 0.");
       setIsConfigOpen(true);
       return;
+    }
+
+    if (clearExisting) {
+      clearGeneratedPractice();
     }
 
     const { data } = await generateQuery.refetch();
@@ -303,6 +324,14 @@ export function WordSelection() {
       localStorage.removeItem("currentStory");
       setIsConfigOpen(false); 
     }
+  };
+
+  const handleGenerate = () => {
+    void generateWords(false);
+  };
+
+  const handleRegenerateWords = () => {
+    void generateWords(true);
   };
 
   const unratedWords = words.filter(w => !syncedIds.has(w.id) && pendingRatings[w.id] === undefined);
@@ -623,95 +652,117 @@ export function WordSelection() {
 
         <div className="flex-1 overflow-y-auto pr-2 pb-8 space-y-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
           {words.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {words.map((word) => {
-                const isSynced = syncedIds.has(word.id);
-                const pendingRating = pendingRatings[word.id];
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 px-1">
+                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+                  Word List ({syncedIds.size}/{words.length} synced)
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 shrink-0 gap-2 px-3 text-xs font-bold"
+                  onClick={handleRegenerateWords}
+                  disabled={generateQuery.isFetching}
+                >
+                  {generateQuery.isFetching ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  )}
+                  Regenerate Words
+                </Button>
+              </div>
 
-                return (
-                  <Card
-                    key={word.id}
-                    id={`word-card-${word.id}`}
-                    className={`hover:shadow-md transition-all duration-200 border-l-4 border-r border-t border-b ${word.cefr.startsWith("A") ? "border-l-green-500" :
-                      word.cefr.startsWith("B") ? "border-l-blue-500" :
-                        "border-l-purple-500"
-                      } ${isSynced ? "opacity-50 grayscale bg-muted/30" : pendingRating !== undefined ? "bg-primary/5 border-primary/20 shadow-sm" : "bg-card shadow-sm border-muted/50"}`}>
-                    <CardContent className="p-4 flex flex-col gap-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className={`text-xl font-bold ${cefrColor(word.cefr)} tracking-tight`}>
-                            {word.text}
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-secondary/50 text-secondary-foreground w-fit mt-1">
-                            {word.cefr}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors" onClick={() => playTTS(word.text)}>
-                            <Volume2 className="h-5 w-5" />
-                          </Button>
-                          {isSynced && <CheckCircle2 className="h-6 w-6 text-green-500" />}
-                          {!isSynced && pendingRating !== undefined && (
-                            <div className="flex items-center gap-2">
-                              <div className="text-[10px] font-black uppercase px-2 py-1 bg-primary text-primary-foreground rounded">
-                                {ratingLabels[pendingRating]}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {words.map((word) => {
+                  const isSynced = syncedIds.has(word.id);
+                  const pendingRating = pendingRatings[word.id];
+
+                  return (
+                    <Card
+                      key={word.id}
+                      id={`word-card-${word.id}`}
+                      className={`hover:shadow-md transition-all duration-200 border-l-4 border-r border-t border-b ${word.cefr.startsWith("A") ? "border-l-green-500" :
+                        word.cefr.startsWith("B") ? "border-l-blue-500" :
+                          "border-l-purple-500"
+                        } ${isSynced ? "opacity-50 grayscale bg-muted/30" : pendingRating !== undefined ? "bg-primary/5 border-primary/20 shadow-sm" : "bg-card shadow-sm border-muted/50"}`}>
+                      <CardContent className="p-4 flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <span className={`text-xl font-bold ${cefrColor(word.cefr)} tracking-tight`}>
+                              {word.text}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-secondary/50 text-secondary-foreground w-fit mt-1">
+                              {word.cefr}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors" onClick={() => playTTS(word.text)}>
+                              <Volume2 className="h-5 w-5" />
+                            </Button>
+                            {isSynced && <CheckCircle2 className="h-6 w-6 text-green-500" />}
+                            {!isSynced && pendingRating !== undefined && (
+                              <div className="flex items-center gap-2">
+                                <div className="text-[10px] font-black uppercase px-2 py-1 bg-primary text-primary-foreground rounded">
+                                  {ratingLabels[pendingRating]}
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-full text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:text-orange-400 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
+                                  onClick={() => handleResetRating(word.id)}
+                                  title="Reset Rating"
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
                               </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid min-h-8 grid-cols-4 gap-1.5 mt-2">
+                          {!isSynced && pendingRating === undefined && (
+                            <>
                               <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 rounded-full text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:text-orange-400 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
-                                onClick={() => handleResetRating(word.id)}
-                                title="Reset Rating"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-red-200 bg-red-50 px-1 text-[11px] font-bold text-red-700 transition-colors hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20 dark:hover:text-red-200"
+                                onClick={() => handleReview(word.id, Rating.Again)}
                               >
-                                <RotateCcw className="h-4 w-4" />
+                                Again
                               </Button>
-                            </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-orange-200 bg-orange-50 px-1 text-[11px] font-bold text-orange-700 transition-colors hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/20 dark:hover:text-orange-200"
+                                onClick={() => handleReview(word.id, Rating.Hard)}
+                              >
+                                Hard
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-green-200 bg-green-50 px-1 text-[11px] font-bold text-green-700 transition-colors hover:bg-green-100 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/20 dark:hover:text-green-200"
+                                onClick={() => handleReview(word.id, Rating.Good)}
+                              >
+                                Good
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-blue-200 bg-blue-50 px-1 text-[11px] font-bold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 dark:hover:text-blue-200"
+                                onClick={() => handleReview(word.id, Rating.Easy)}
+                              >
+                                Easy
+                              </Button>
+                            </>
                           )}
                         </div>
-                      </div>
-
-                      <div className="grid min-h-8 grid-cols-4 gap-1.5 mt-2">
-                        {!isSynced && pendingRating === undefined && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-red-200 bg-red-50 px-1 text-[11px] font-bold text-red-700 transition-colors hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20 dark:hover:text-red-200"
-                              onClick={() => handleReview(word.id, Rating.Again)}
-                            >
-                              Again
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-orange-200 bg-orange-50 px-1 text-[11px] font-bold text-orange-700 transition-colors hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/20 dark:hover:text-orange-200"
-                              onClick={() => handleReview(word.id, Rating.Hard)}
-                            >
-                              Hard
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-green-200 bg-green-50 px-1 text-[11px] font-bold text-green-700 transition-colors hover:bg-green-100 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/20 dark:hover:text-green-200"
-                              onClick={() => handleReview(word.id, Rating.Good)}
-                            >
-                              Good
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 border-blue-200 bg-blue-50 px-1 text-[11px] font-bold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 dark:hover:text-blue-200"
-                              onClick={() => handleReview(word.id, Rating.Easy)}
-                            >
-                              Easy
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <Card className="h-full bg-muted/30 border-dashed flex flex-col items-center justify-center p-12 text-center">
