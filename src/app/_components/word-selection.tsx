@@ -886,7 +886,7 @@ export function WordSelection() {
             >
               <div
                 dangerouslySetInnerHTML={{ __html: processedStory() }}
-                className="[&>mark]:rounded [&>mark]:border-b-2 [&>mark]:border-indigo-300/40 [&>mark]:bg-indigo-100/70 [&>mark]:px-1 [&>mark]:py-0.5 [&>mark]:font-bold [&>mark]:text-indigo-900 [&>mark]:transition-all [&>mark]:duration-300 [&>mark]:cursor-pointer hover:[&>mark]:bg-indigo-200/80 dark:[&>mark]:bg-indigo-400/20 dark:[&>mark]:text-indigo-100 dark:hover:[&>mark]:bg-indigo-400/35 [&>mark[data-rated='true']]:cursor-default [&>mark[data-rated='true']]:opacity-40 [&>mark[data-rated='true']]:grayscale [&>u]:cursor-help [&>u]:decoration-blue-400/50 [&>u]:decoration-dashed [&>u]:underline-offset-4 font-sans text-base leading-relaxed text-foreground md:text-lg"
+                className="[&_mark]:cursor-pointer [&_mark]:rounded [&_mark]:border-b-2 [&_mark]:border-orange-300/40 [&_mark]:bg-orange-100/60 [&_mark]:px-1 [&_mark]:py-0.5 [&_mark]:font-bold [&_mark]:text-orange-900 [&_mark]:transition-all [&_mark]:duration-300 hover:[&_mark]:bg-orange-200/70 dark:[&_mark]:bg-orange-400/20 dark:[&_mark]:text-orange-100 dark:hover:[&_mark]:bg-orange-400/30 [&_mark[data-rated='true']]:cursor-default [&_mark[data-rated='true']]:opacity-40 [&_mark[data-rated='true']]:grayscale [&_u]:cursor-help [&_u]:decoration-orange-300/50 [&_u]:decoration-dashed [&_u]:underline-offset-4 font-sans text-base leading-relaxed text-foreground md:text-lg"
               />
             </div>
           ) : !generateStoryMutation.isPending && (
