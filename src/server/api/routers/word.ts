@@ -20,6 +20,18 @@ STRATEGIC INSTRUCTIONS:
 6. COHERENCE: The story must be a single, flowing narrative.
 `;
 
+const normalizeTargetWord = (word: string) => word.trim().toLowerCase();
+
+const findMissingMarkedWords = (story: string, words: string[]) => {
+  const markedWords = new Set(
+    Array.from(story.matchAll(/<mark\s+[^>]*data-word=["']([^"']+)["'][^>]*>/gi)).map((match) =>
+      normalizeTargetWord(match[1] ?? ""),
+    ),
+  );
+
+  return words.filter((word) => !markedWords.has(normalizeTargetWord(word)));
+};
+
 const reviewRatingSchema = z.union([
   z.literal(Rating.Again),
   z.literal(Rating.Hard),
@@ -154,12 +166,13 @@ export const wordRouter = createTRPCRouter({
         words: z.array(z.string().min(1)).min(1).max(100),
         difficulty: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
         theme: z.string().max(80).optional(),
+        mode: z.enum(["multiple", "single"]).default("multiple"),
       })
     )
     .mutation(async ({ input }) => {
-      const { words, difficulty, theme } = input;
+      const { words, difficulty, theme, mode } = input;
       const wordCount = words.length;
-      const targetLength = Math.max(80, wordCount * 15);
+      const targetLength = mode === "single" ? 240 : Math.max(80, wordCount * 15);
       const start = Date.now();
 
       const themeContext = theme && theme !== "General" 
@@ -168,26 +181,55 @@ export const wordRouter = createTRPCRouter({
            Priority 1 is natural narrative flow.` 
         : "The story can be about any engaging topic.";
 
-      const prompt = `
-        Create a level ${difficulty} story (approx. ${targetLength} words).
+      const storyShape =
+        mode === "single"
+          ? `
+        Create exactly THREE short, coherent stories for the single target word.
+        Each story should be natural, practical, and focused on the most common usage of the word.
+        The surrounding context must make the meaning and usage easy to infer.
+        Use the target word at least twice in each story, and mark every target-word occurrence you intentionally use.
+        Keep the total output around ${targetLength} words.
+      `
+          : `
+        Create one level ${difficulty} story (approx. ${targetLength} words).
+        The story must include every target word at least once.
+      `;
+
+      const buildPrompt = (missingWords: string[] = []) => `
+        ${storyShape}
         THEME/SETTING: ${themeContext}
         TARGET WORDS: ${words.join(", ")}.
+        ${missingWords.length > 0 ? `PREVIOUS ATTEMPT MISSED THESE REQUIRED data-word MARKS: ${missingWords.join(", ")}.` : ""}
         
         TASK:
         - Weave these words into a natural story using strong COLLOCATIONS.
         - Wrap the FULL LEXICAL CHUNK in <u> tags.
         - Wrap the TARGET WORD in <mark data-word="original_word"> tags (inside the <u> tags).
         - IMPORTANT: 'data-word' MUST match the exact spelling from the TARGET WORDS list.
+        - Every target word must appear inside at least one valid <mark data-word="..."> tag.
         - No Markdown formatting.
       `;
 
-      const story = await callProvider(prompt, { 
+      let story = await callProvider(buildPrompt(), {
         systemInstruction: STORY_SYSTEM_PROMPT 
       });
+      let missingWords = findMissingMarkedWords(story, words);
+
+      if (missingWords.length > 0) {
+        story = await callProvider(buildPrompt(missingWords), {
+          systemInstruction: STORY_SYSTEM_PROMPT,
+          temperature: 0.5,
+        });
+        missingWords = findMissingMarkedWords(story, words);
+      }
+
+      if (missingWords.length > 0) {
+        throw new Error(`AI story missed required target words: ${missingWords.join(", ")}`);
+      }
 
       if (process.env.NODE_ENV === "development") {
         console.info(
-          `[word.generateStory] words=${wordCount} targetLength=${targetLength} duration=${Date.now() - start}ms`,
+          `[word.generateStory] mode=${mode} words=${wordCount} targetLength=${targetLength} duration=${Date.now() - start}ms`,
         );
       }
 
@@ -385,11 +427,12 @@ export const wordRouter = createTRPCRouter({
         """
         
         TASK:
-        1. Explain the meaning of "${word}" specifically as it is used in the context of this story.
-        2. Provide your explanation in clear, simple English.
-        3. If it's a phrase or has a specific connotation in this text, highlight that.
-        4. Keep the explanation concise but thorough (approx 2-4 sentences).
-        5. Output ONLY the explanation text. No conversational filler.
+        1. First explain the general meaning and common usage of "${word}".
+        2. Then explain what "${word}" means specifically in this story context.
+        3. Provide your explanation in clear, simple English.
+        4. If it's a phrase or has a specific connotation in this text, highlight that.
+        5. Keep the explanation concise but thorough (approx 3-5 sentences).
+        6. Output ONLY the explanation text. No conversational filler.
       `;
 
       return callProvider(prompt, {

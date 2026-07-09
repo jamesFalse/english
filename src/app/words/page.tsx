@@ -5,12 +5,12 @@ import Link from "next/link";
 export default async function WordsPage() {
   return (
     <HydrateClient>
-      <main className="flex h-screen flex-col bg-background text-foreground overflow-hidden">
-        <header className="py-6 px-4 flex-shrink-0 flex items-center justify-between max-w-7xl mx-auto w-full">
+      <main className="flex min-h-dvh flex-col overflow-y-auto bg-background text-foreground lg:h-screen lg:overflow-hidden">
+        <header className="mx-auto flex w-full max-w-7xl flex-shrink-0 items-center justify-between gap-3 px-3 py-4 sm:px-4 sm:py-6">
           <Link href="/" className="text-sm font-medium text-blue-600 hover:underline">
             ← Back to Home
           </Link>
-          <h1 className="text-2xl font-extrabold tracking-tight sm:text-4xl text-primary">
+          <h1 className="text-center text-xl font-extrabold tracking-tight text-primary sm:text-4xl">
             AI Vocabulary <span className="text-blue-600">Learning</span>
           </h1>
           <Link href="/words/triage" className="text-xs font-bold px-3 py-1.5 bg-muted rounded-full hover:bg-muted/80 transition-colors">
@@ -18,7 +18,7 @@ export default async function WordsPage() {
           </Link>
         </header>
         
-        <div className="flex-1 overflow-hidden px-4 pb-6 w-full max-w-[1600px] mx-auto">
+        <div className="mx-auto w-full max-w-[1600px] flex-1 px-3 pb-6 sm:px-4 lg:overflow-hidden">
           <WordSelection />
         </div>
       </main>

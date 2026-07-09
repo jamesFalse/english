@@ -17,7 +17,7 @@ The goal is to revolutionize English vocabulary acquisition by replacing rote me
 - **Frontend**: Next.js 15 (App Router) for high-performance React rendering.
 - **Backend**: tRPC for type-safe communication between the client and the database.
 - **ORM**: Prisma with PostgreSQL, utilizing a scientifically-optimized `Word` model.
-- **AI**: Google Gemini (Default: **gemini-3.1-flash-lite**) or DeepSeek (Default: **deepseek-v4-pro**) via the central `callProvider` utility, selected by `PROVIDER`.
+- **AI**: Google Gemini (Default: **gemini-3.1-flash-lite**) or DeepSeek (Default: **deepseek-v4-flash**) via the central `callProvider` utility, selected by `PROVIDER`.
 - **Offline Engine**: Local LanguageTool HTTP server (port 8081).
 - **Security**: Tiered protection via tRPC Middleware and Global `AuthGuard`.
 

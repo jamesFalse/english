@@ -5,7 +5,7 @@ import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Volume2, Loader2, BookOpen, CheckCircle2, RotateCcw, Save, ChevronDown, ChevronUp, Settings2, HelpCircle, X, Sparkles } from "lucide-react";
+import { Loader2, BookOpen, CheckCircle2, RotateCcw, Save, ChevronDown, ChevronUp, Settings2, HelpCircle, X, Sparkles, Shuffle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Rating } from "ts-fsrs";
 
@@ -13,6 +13,7 @@ const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 
 type CefrLevel = (typeof CEFR_LEVELS)[number];
 type ReviewRating = Rating.Again | Rating.Hard | Rating.Good | Rating.Easy;
+type StudyMode = "multiple" | "single";
 type SelectedWord = { id: number; text: string; cefr: string };
 type WordQuotas = {
   reviewCount: number;
@@ -66,6 +67,15 @@ const parseSelectedWords = (value: unknown): SelectedWord[] => {
   });
 };
 
+const uniqueSelectedWords = (wordList: SelectedWord[]) => {
+  const seen = new Set<number>();
+  return wordList.filter((word) => {
+    if (seen.has(word.id)) return false;
+    seen.add(word.id);
+    return true;
+  });
+};
+
 const parseSelectionStats = (value: unknown): SelectionStats | null => {
   if (!isRecord(value)) return null;
 
@@ -98,33 +108,59 @@ const parseQuotas = (value: unknown): WordQuotas => {
   };
 };
 
-const cefrColor = (cefr: string) => {
-  if (cefr.startsWith("A")) return "text-green-500";
-  if (cefr.startsWith("B")) return "text-blue-500";
-  if (cefr.startsWith("C")) return "text-purple-500";
-  return "text-gray-500";
+const cefrPillClass = (cefr: string) => {
+  if (cefr.startsWith("A")) return "border-green-200 bg-green-50 text-green-700 dark:border-green-500/25 dark:bg-green-500/10 dark:text-green-300";
+  if (cefr.startsWith("B")) return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-300";
+  if (cefr.startsWith("C")) return "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/25 dark:bg-purple-500/10 dark:text-purple-300";
+  return "border-muted bg-muted/40 text-muted-foreground";
 };
 
-const ratingLabels: Record<number, string> = {
-  [Rating.Again]: "Again",
-  [Rating.Hard]: "Hard",
-  [Rating.Good]: "Good",
-  [Rating.Easy]: "Easy",
+const cefrChunkClass = (cefr: string) => {
+  if (cefr.startsWith("A")) return "rounded bg-green-50/70 px-1 py-0.5 decoration-green-300/50 dark:bg-green-500/10";
+  if (cefr.startsWith("B")) return "rounded bg-blue-50/70 px-1 py-0.5 decoration-blue-300/50 dark:bg-blue-500/10";
+  if (cefr.startsWith("C")) return "rounded bg-purple-50/70 px-1 py-0.5 decoration-purple-300/50 dark:bg-purple-500/10";
+  return "rounded bg-muted/40 px-1 py-0.5";
+};
+
+const ratingPillClass = (rating: ReviewRating) => {
+  if (rating === Rating.Again) return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300";
+  if (rating === Rating.Hard) return "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300";
+  if (rating === Rating.Good) return "border-green-200 bg-green-50 text-green-700 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300";
+  return "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300";
+};
+
+const ratingMarkClass = (rating: ReviewRating) => {
+  if (rating === Rating.Again) return "cursor-pointer rounded border-b-2 border-red-400 bg-red-100 px-1 py-0.5 font-bold text-red-900 transition-all hover:bg-red-200 dark:bg-red-500/20 dark:text-red-100 dark:hover:bg-red-500/30";
+  if (rating === Rating.Hard) return "cursor-pointer rounded border-b-2 border-orange-400 bg-orange-100 px-1 py-0.5 font-bold text-orange-900 transition-all hover:bg-orange-200 dark:bg-orange-500/20 dark:text-orange-100 dark:hover:bg-orange-500/30";
+  if (rating === Rating.Good) return "cursor-pointer rounded border-b-2 border-green-400 bg-green-100 px-1 py-0.5 font-bold text-green-900 transition-all hover:bg-green-200 dark:bg-green-500/20 dark:text-green-100 dark:hover:bg-green-500/30";
+  return "cursor-pointer rounded border-b-2 border-blue-400 bg-blue-100 px-1 py-0.5 font-bold text-blue-900 transition-all hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-100 dark:hover:bg-blue-500/30";
+};
+
+const cefrMarkClass = (cefr: string) => {
+  if (cefr.startsWith("A")) return "cursor-pointer rounded border-b-2 border-green-300 bg-green-100/70 px-1 py-0.5 font-bold text-green-900 transition-all hover:bg-green-200/80 dark:bg-green-500/20 dark:text-green-100 dark:hover:bg-green-500/30";
+  if (cefr.startsWith("B")) return "cursor-pointer rounded border-b-2 border-blue-300 bg-blue-100/70 px-1 py-0.5 font-bold text-blue-900 transition-all hover:bg-blue-200/80 dark:bg-blue-500/20 dark:text-blue-100 dark:hover:bg-blue-500/30";
+  if (cefr.startsWith("C")) return "cursor-pointer rounded border-b-2 border-purple-300 bg-purple-100/70 px-1 py-0.5 font-bold text-purple-900 transition-all hover:bg-purple-200/80 dark:bg-purple-500/20 dark:text-purple-100 dark:hover:bg-purple-500/30";
+  return "cursor-pointer rounded border-b-2 border-muted-foreground/30 bg-muted px-1 py-0.5 font-bold text-foreground transition-all";
 };
 
 export function WordSelection() {
   const [quotas, setQuotas] = useState<WordQuotas>({ reviewCount: 20, basicCount: 10, independentCount: 10, proficientCount: 1 });
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isMobileWordsOpen, setIsMobileWordsOpen] = useState(false);
+  const [isMobileStoryConfigOpen, setIsMobileStoryConfigOpen] = useState(false);
+  const [studyMode, setStudyMode] = useState<StudyMode>("multiple");
   const [words, setWords] = useState<SelectedWord[]>([]);
   const [selectionStats, setSelectionStats] = useState<SelectionStats | null>(null);
   const [difficulty, setDifficulty] = useState<CefrLevel>("B1");
   const [theme, setTheme] = useState("General");
   const [story, setStory] = useState("");
+  const [activeSingleWordId, setActiveSingleWordId] = useState<number | null>(null);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
 
   // New States for Batching and Undo
   const [pendingRatings, setPendingRatings] = useState<Record<number, ReviewRating>>({});
   const [syncedIds, setSyncedIds] = useState<Set<number>>(new Set());
+  const [syncedRatings, setSyncedRatings] = useState<Record<number, ReviewRating>>({});
 
   // Floating UI State
   const [floatingMenu, setFloatingMenu] = useState<{ x: number, y: number, wordId: number, text: string } | null>(null);
@@ -174,14 +210,28 @@ export function WordSelection() {
   const submitBatchReviewMutation = api.word.submitBatchReview.useMutation({
     onSuccess: (_, variables) => {
       const submittedIds = variables.map(v => v.wordId);
-      const newSyncedIds = new Set([...syncedIds, ...submittedIds]);
-      setSyncedIds(newSyncedIds);
-      localStorage.setItem("syncedIds", JSON.stringify(Array.from(newSyncedIds)));
+      setSyncedIds((prev) => {
+        const next = new Set([...prev, ...submittedIds]);
+        localStorage.setItem("syncedIds", JSON.stringify(Array.from(next)));
+        return next;
+      });
+      setSyncedRatings((prev) => {
+        const next = { ...prev };
+        variables.forEach(({ wordId, rating }) => {
+          next[wordId] = rating;
+        });
+        localStorage.setItem("syncedRatings", JSON.stringify(next));
+        return next;
+      });
 
       // Clear submitted from pending
       setPendingRatings(prev => {
         const next = { ...prev };
-        submittedIds.forEach(id => delete next[id]);
+        variables.forEach(({ wordId, rating }) => {
+          if (next[wordId] === rating) {
+            delete next[wordId];
+          }
+        });
         localStorage.setItem("pendingRatings", JSON.stringify(next));
         return next;
       });
@@ -194,18 +244,24 @@ export function WordSelection() {
   // Load from localStorage on mount
   useEffect(() => {
     const savedRatings = localStorage.getItem("pendingRatings");
+    const savedSyncedRatings = localStorage.getItem("syncedRatings");
     const savedWords = localStorage.getItem("currentWords");
     const savedSelectionStats = localStorage.getItem("currentSelectionStats");
     const savedSyncedIds = localStorage.getItem("syncedIds");
     const savedStory = localStorage.getItem("currentStory");
     const savedQuotas = localStorage.getItem("wordQuotas");
     const savedTheme = localStorage.getItem("currentTheme");
+    const savedStudyMode = localStorage.getItem("wordStudyMode");
+    const savedActiveSingleWordId = localStorage.getItem("activeSingleWordId");
 
     if (savedRatings) {
       try { setPendingRatings(parsePendingRatings(parseJson(savedRatings))); } catch (e) { console.error(e); }
     }
+    if (savedSyncedRatings) {
+      try { setSyncedRatings(parsePendingRatings(parseJson(savedSyncedRatings))); } catch (e) { console.error(e); }
+    }
     if (savedWords) {
-      try { setWords(parseSelectedWords(parseJson(savedWords))); } catch (e) { console.error(e); }
+      try { setWords(uniqueSelectedWords(parseSelectedWords(parseJson(savedWords)))); } catch (e) { console.error(e); }
     }
     if (savedSelectionStats) {
       try { setSelectionStats(parseSelectionStats(parseJson(savedSelectionStats))); } catch (e) { console.error(e); }
@@ -224,6 +280,13 @@ export function WordSelection() {
     if (savedTheme) {
       setTheme(savedTheme);
     }
+    if (savedStudyMode === "single" || savedStudyMode === "multiple") {
+      setStudyMode(savedStudyMode);
+    }
+    if (savedActiveSingleWordId) {
+      const numericId = Number(savedActiveSingleWordId);
+      if (Number.isInteger(numericId)) setActiveSingleWordId(numericId);
+    }
     setHasLoadedStorage(true);
   }, []);
 
@@ -231,6 +294,20 @@ export function WordSelection() {
     if (!hasLoadedStorage) return;
     localStorage.setItem("currentTheme", theme);
   }, [hasLoadedStorage, theme]);
+
+  useEffect(() => {
+    if (!hasLoadedStorage) return;
+    localStorage.setItem("wordStudyMode", studyMode);
+  }, [hasLoadedStorage, studyMode]);
+
+  useEffect(() => {
+    if (!hasLoadedStorage) return;
+    if (activeSingleWordId === null) {
+      localStorage.removeItem("activeSingleWordId");
+    } else {
+      localStorage.setItem("activeSingleWordId", String(activeSingleWordId));
+    }
+  }, [activeSingleWordId, hasLoadedStorage]);
 
   // Sync states to localStorage
   useEffect(() => {
@@ -272,6 +349,15 @@ export function WordSelection() {
 
   useEffect(() => {
     if (!hasLoadedStorage) return;
+    if (Object.keys(syncedRatings).length > 0) {
+      localStorage.setItem("syncedRatings", JSON.stringify(syncedRatings));
+    } else {
+      localStorage.removeItem("syncedRatings");
+    }
+  }, [hasLoadedStorage, syncedRatings]);
+
+  useEffect(() => {
+    if (!hasLoadedStorage) return;
     if (story) {
       localStorage.setItem("currentStory", story);
     } else {
@@ -285,6 +371,8 @@ export function WordSelection() {
     setStory("");
     setPendingRatings({});
     setSyncedIds(new Set());
+    setSyncedRatings({});
+    setActiveSingleWordId(null);
     setExplanation(null);
     setExplanationWord(null);
     setFloatingMenu(null);
@@ -293,10 +381,34 @@ export function WordSelection() {
     localStorage.removeItem("currentWords");
     localStorage.removeItem("currentSelectionStats");
     localStorage.removeItem("syncedIds");
+    localStorage.removeItem("syncedRatings");
+    localStorage.removeItem("activeSingleWordId");
     localStorage.removeItem("currentStory");
   };
 
-  const generateWords = async (clearExisting: boolean) => {
+  const isWordRated = (word: SelectedWord) =>
+    pendingRatings[word.id] !== undefined || syncedIds.has(word.id) || syncedRatings[word.id] !== undefined;
+
+  const getUnratedWords = (wordList = words) =>
+    wordList.filter(w => !isWordRated(w));
+
+  const generateStoryForWords = (targetWords: SelectedWord[], mode: StudyMode) => {
+    if (targetWords.length === 0) return;
+
+    generateStoryMutation.mutate({
+      words: targetWords.map((w) => w.text),
+      difficulty,
+      theme,
+      mode,
+    });
+  };
+
+  const pickRandomWord = (wordList: SelectedWord[]) => {
+    if (wordList.length === 0) return null;
+    return wordList[Math.floor(Math.random() * wordList.length)] ?? null;
+  };
+
+  const generateWords = async (clearExisting: boolean, modeOverride: StudyMode = studyMode) => {
     const totalRequested = quotas.reviewCount + quotas.basicCount + quotas.independentCount + quotas.proficientCount;
     if (totalRequested <= 0) {
       alert("Please set at least one word count to greater than 0.");
@@ -308,21 +420,50 @@ export function WordSelection() {
       clearGeneratedPractice();
     }
 
-    const { data } = await generateQuery.refetch();
-    if (data) {
-      setWords(data.words);
+    try {
+      const { data, error } = await generateQuery.refetch();
+      if (error) {
+        alert(`Word selection failed: ${error.message}`);
+        return;
+      }
+
+      if (data) {
+        const nextWords = uniqueSelectedWords(data.words);
+      setWords(nextWords);
       setSelectionStats(data.stats);
       setStory("");
       setPendingRatings({});
       setSyncedIds(new Set());
+      setSyncedRatings({});
       setExplanation(null);
       setExplanationWord(null);
+      setActiveSingleWordId(null);
       localStorage.removeItem("pendingRatings");
       localStorage.removeItem("currentWords");
       localStorage.removeItem("currentSelectionStats");
       localStorage.removeItem("syncedIds");
+      localStorage.removeItem("syncedRatings");
+      localStorage.removeItem("activeSingleWordId");
       localStorage.removeItem("currentStory");
-      setIsConfigOpen(false); 
+      setIsConfigOpen(false);
+
+      if (nextWords.length === 0) {
+        alert("No words were selected. Try increasing a quota or checking your word data.");
+        return;
+      }
+
+      if (modeOverride === "single") {
+        const nextWord = pickRandomWord(nextWords);
+        if (nextWord) {
+          setActiveSingleWordId(nextWord.id);
+          generateStoryForWords([nextWord], "single");
+        }
+      } else {
+        generateStoryForWords(nextWords, "multiple");
+      }
+      }
+    } catch (error) {
+      alert(`Word selection failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
@@ -331,23 +472,73 @@ export function WordSelection() {
   };
 
   const handleRegenerateWords = () => {
-    void generateWords(true);
+    if (studyMode === "single") {
+      setStudyMode("multiple");
+    }
+    void generateWords(true, "multiple");
   };
 
-  const unratedWords = words.filter(w => !syncedIds.has(w.id) && pendingRatings[w.id] === undefined);
+  const unratedWords = getUnratedWords();
+  const activeSingleWord = activeSingleWordId === null ? null : words.find((word) => word.id === activeSingleWordId) ?? null;
 
   const handleGenerateStory = () => {
     if (unratedWords.length === 0) return;
 
-    generateStoryMutation.mutate({
-      words: unratedWords.map((w) => w.text),
-      difficulty,
-      theme,
-    });
+    if (studyMode === "single") {
+      const nextWord = activeSingleWord && unratedWords.some((word) => word.id === activeSingleWord.id)
+        ? activeSingleWord
+        : pickRandomWord(unratedWords);
+
+      if (!nextWord) return;
+      setActiveSingleWordId(nextWord.id);
+      generateStoryForWords([nextWord], "single");
+      return;
+    }
+
+    generateStoryForWords(unratedWords, "multiple");
+  };
+
+  const handleModeChange = (mode: StudyMode) => {
+    setStudyMode(mode);
+    setStory("");
+    setExplanation(null);
+    setExplanationWord(null);
+    setFloatingMenu(null);
+    setSelectionMenu(null);
+
+    if (mode === "single") {
+      const nextWord = pickRandomWord(unratedWords);
+      if (nextWord) {
+        setActiveSingleWordId(nextWord.id);
+        generateStoryForWords([nextWord], "single");
+      }
+      return;
+    }
+
+    setActiveSingleWordId(null);
+    if (unratedWords.length > 0) {
+      generateStoryForWords(unratedWords, "multiple");
+    }
+  };
+
+  const handleRandomSingleWord = () => {
+    const nextWord = pickRandomWord(unratedWords);
+    if (!nextWord) return;
+    setActiveSingleWordId(nextWord.id);
+    generateStoryForWords([nextWord], "single");
+  };
+
+  const handleSelectSingleWord = (wordId: string | null) => {
+    if (!wordId) return;
+    const numericId = Number(wordId);
+    const nextWord = unratedWords.find((word) => word.id === numericId);
+    if (!nextWord) return;
+    setActiveSingleWordId(nextWord.id);
+    generateStoryForWords([nextWord], "single");
   };
 
   const handleReview = (wordId: number, rating: ReviewRating) => {
-    if (syncedIds.has(wordId)) return;
+    if (syncedIds.has(wordId) || syncedRatings[wordId] !== undefined) return;
 
     setPendingRatings((prev) => ({ ...prev, [wordId]: rating }));
     setFloatingMenu(null);
@@ -438,14 +629,17 @@ export function WordSelection() {
   };
 
   const handleBatchSubmit = async () => {
-    const entries = Object.entries(pendingRatings).map(([id, rating]) => ({
-      wordId: Number(id),
-      rating,
-    }));
+    const currentWordIds = new Set(words.map((word) => word.id));
+    const entries = Object.entries(pendingRatings)
+      .map(([id, rating]) => ({
+        wordId: Number(id),
+        rating,
+      }))
+      .filter(({ wordId }) => currentWordIds.has(wordId));
 
     if (entries.length === 0) return;
 
-    const unratedCount = words.length - syncedIds.size - entries.length;
+    const unratedCount = getUnratedWords().length;
     if (unratedCount > 0) {
       if (!confirm(`You have ${unratedCount} words unrated. Do you want to sync the current ${entries.length} ratings first?`)) {
         return;
@@ -455,14 +649,6 @@ export function WordSelection() {
     submitBatchReviewMutation.mutate(entries);
   };
 
-  const handleResetRating = (wordId: number) => {
-    setPendingRatings((prev) => {
-      const next = { ...prev };
-      delete next[wordId];
-      return next;
-    });
-  };
-
   const playTTS = (text: string) => {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
@@ -470,9 +656,16 @@ export function WordSelection() {
     window.speechSynthesis.speak(utterance);
   };
 
-  const allSynced = words.length > 0 && syncedIds.size === words.length;
-  const hasPending = Object.keys(pendingRatings).length > 0;
+  const ratedWordCount = words.filter(isWordRated).length;
+  const pendingWordCount = words.filter((word) => pendingRatings[word.id] !== undefined).length;
+  const syncedWordCount = words.filter((word) => syncedIds.has(word.id) || syncedRatings[word.id] !== undefined).length;
+  const allSynced = words.length > 0 && syncedWordCount === words.length && pendingWordCount === 0;
+  const hasPending = pendingWordCount > 0;
   const showExplanationPanel = explainMutation.isPending ? true : explanation !== null;
+  const selectedWordGroups = CEFR_LEVELS.map((level) => ({
+    level,
+    words: words.filter((word) => word.cefr === level),
+  })).filter((group) => group.words.length > 0);
   const selectionStatItems = selectionStats
     ? [
         { label: "Review", value: selectionStats.review, requested: quotas.reviewCount, className: "text-orange-700 bg-orange-50 border-orange-100 dark:text-orange-300 dark:bg-orange-500/10 dark:border-orange-500/20" },
@@ -510,15 +703,23 @@ export function WordSelection() {
       const children = Array.from(element.childNodes).map(sanitizeNode).join("");
 
       if (tagName === "br") return "<br>";
-      if (tagName === "u") return `<u>${children}</u>`;
+      if (tagName === "u") {
+        const rawWord = element.querySelector("mark[data-word]")?.getAttribute("data-word") ?? "";
+        const word = allowedWords.get(rawWord.toLowerCase());
+        const className = word ? cefrChunkClass(word.cefr) : "rounded bg-muted/30 px-1 py-0.5";
+        return `<u class="${className}">${children}</u>`;
+      }
       if (tagName === "mark") {
         const rawWord = element.getAttribute("data-word") ?? "";
         const word = allowedWords.get(rawWord.toLowerCase());
         if (!word) return children;
 
-        const isRated = syncedIds.has(word.id) || pendingRatings[word.id] !== undefined;
+        const rating = pendingRatings[word.id] ?? syncedRatings[word.id];
+        const isRated = syncedIds.has(word.id) || rating !== undefined;
         const ratedAttr = isRated ? ' data-rated="true"' : "";
-        return `<mark data-word="${escapeHtml(word.text)}"${ratedAttr}>${children}</mark>`;
+        const ratingAttr = rating !== undefined ? ` data-rating="${rating}"` : "";
+        const className = rating !== undefined ? ratingMarkClass(rating) : cefrMarkClass(word.cefr);
+        return `<mark data-word="${escapeHtml(word.text)}"${ratedAttr}${ratingAttr} class="${className}">${children}</mark>`;
       }
 
       return children;
@@ -527,261 +728,361 @@ export function WordSelection() {
     return Array.from(doc.body.childNodes).map(sanitizeNode).join("");
   };
 
-  return (
-    <div className="w-full h-full flex flex-col lg:flex-row gap-8 overflow-hidden items-stretch" onClick={() => {
-      setFloatingMenu(null);
-      setSelectionMenu(null);
-    }}>
-      {/* Left Column: Word Selection & List */}
-      <div className="flex flex-col h-full lg:w-1/2 min-w-0">
-        <div className="flex-none space-y-4 mb-4">
-          <Card className="shadow-md border-2 border-muted/50 overflow-hidden">
-            <CardHeader 
-              className="pb-4 flex flex-row items-center justify-between cursor-pointer hover:bg-muted/30 transition-colors py-3"
-              onClick={() => setIsConfigOpen(!isConfigOpen)}
-            >
-              <div className="flex items-center gap-2">
-                <Settings2 className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg font-bold">Selection Config</CardTitle>
-              </div>
-              {isConfigOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-            </CardHeader>
-            
-            <div className={`transition-all duration-300 ease-in-out ${isConfigOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"}`}>
-              <CardContent className="pt-2 pb-6">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="space-y-1.5">
-                    <label htmlFor="quota-review" className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Review</label>
-                    <Input
-                      id="quota-review"
-                      type="number"
-                      value={quotas.reviewCount}
-                      onChange={(e) => setQuotas({ ...quotas, reviewCount: Number(e.target.value) })}
-                      className="h-9 font-bold border-orange-200 focus-visible:ring-orange-500 px-2"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="quota-basic" className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Basic (A1/2)</label>
-                    <Input
-                      id="quota-basic"
-                      type="number"
-                      value={quotas.basicCount}
-                      onChange={(e) => setQuotas({ ...quotas, basicCount: Number(e.target.value) })}
-                      className="h-9 font-bold border-green-200 focus-visible:ring-green-500 px-2"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="quota-independent" className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Indep. (B1/2)</label>
-                    <Input
-                      id="quota-independent"
-                      type="number"
-                      value={quotas.independentCount}
-                      onChange={(e) => setQuotas({ ...quotas, independentCount: Number(e.target.value) })}
-                      className="h-9 font-bold border-blue-200 focus-visible:ring-blue-500 px-2"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="quota-proficient" className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Profic. (C1/2)</label>
-                    <Input
-                      id="quota-proficient"
-                      type="number"
-                      value={quotas.proficientCount}
-                      onChange={(e) => setQuotas({ ...quotas, proficientCount: Number(e.target.value) })}
-                      className="h-9 font-bold border-purple-200 focus-visible:ring-purple-500 px-2"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </div>
-          </Card>
-
-          <div className="flex flex-col gap-3">
-            {!allSynced && !hasPending && (
-              <Button
-                className="w-full h-11 text-sm font-bold shadow-md"
-                onClick={handleGenerate}
-                disabled={generateQuery.isFetching}
-              >
-                {generateQuery.isFetching ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                )}
-                {words.length > 0 ? "Regenerate Word List" : "Generate Words to Start"}
-              </Button>
-            )}
-
-            {allSynced ? (
-              <Button
-                className="h-11 w-full border border-emerald-500/30 bg-emerald-500/15 text-sm font-bold text-emerald-700 shadow-md shadow-emerald-950/10 hover:bg-emerald-500/25 dark:text-emerald-300"
-                onClick={handleGenerate}
-              >
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Everything Synced! Start Next Story
-              </Button>
-            ) : hasPending && (
-              <Button
-                className="w-full h-11 text-sm font-bold shadow-md bg-blue-600 hover:bg-blue-700"
-                onClick={handleBatchSubmit}
-                disabled={submitBatchReviewMutation.isPending}
-              >
-                {submitBatchReviewMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                Sync Progress ({Object.keys(pendingRatings).length} words)
-              </Button>
-            )}
-
-            {selectionStats && (
-              <div className="grid grid-cols-4 gap-2">
-                {selectionStatItems.map((item) => (
-                  <div key={item.label} className={`rounded-md border p-2 ${item.className}`}>
-                    <div className="text-[9px] font-black uppercase tracking-wider opacity-75">{item.label}</div>
-                    <div className="flex items-end gap-1">
-                      <span className="text-lg font-black leading-none">{item.value}</span>
-                      <span className="text-[9px] font-bold opacity-60">/ {item.requested}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+  const selectionPanel = (
+    <div className="space-y-3">
+      <Card className="overflow-hidden border border-border shadow-sm">
+        <CardHeader
+          className="flex cursor-pointer flex-row items-center justify-between py-3 transition-colors hover:bg-muted/30"
+          onClick={() => setIsConfigOpen(!isConfigOpen)}
+        >
+          <div className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base font-bold">Selection Config</CardTitle>
           </div>
-        </div>
+          {isConfigOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+        </CardHeader>
 
-        <div className="flex-1 overflow-y-auto pr-2 pb-8 space-y-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-          {words.length > 0 ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3 px-1">
-                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
-                  Word List ({syncedIds.size}/{words.length} synced)
-                </h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 shrink-0 gap-2 px-3 text-xs font-bold"
-                  onClick={handleRegenerateWords}
-                  disabled={generateQuery.isFetching}
-                >
-                  {generateQuery.isFetching ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  )}
-                  Regenerate Words
-                </Button>
+        <div className={`transition-all duration-300 ease-in-out ${isConfigOpen ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"}`}>
+          <CardContent className="pt-2 pb-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label htmlFor="quota-review" className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">Review</label>
+                <Input
+                  id="quota-review"
+                  type="number"
+                  value={quotas.reviewCount}
+                  onChange={(e) => setQuotas({ ...quotas, reviewCount: Number(e.target.value) })}
+                  className="h-9 border-orange-200 px-2 font-bold focus-visible:ring-orange-500"
+                />
               </div>
+              <div className="space-y-1.5">
+                <label htmlFor="quota-basic" className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Basic</label>
+                <Input
+                  id="quota-basic"
+                  type="number"
+                  value={quotas.basicCount}
+                  onChange={(e) => setQuotas({ ...quotas, basicCount: Number(e.target.value) })}
+                  className="h-9 border-green-200 px-2 font-bold focus-visible:ring-green-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="quota-independent" className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Indep.</label>
+                <Input
+                  id="quota-independent"
+                  type="number"
+                  value={quotas.independentCount}
+                  onChange={(e) => setQuotas({ ...quotas, independentCount: Number(e.target.value) })}
+                  className="h-9 border-blue-200 px-2 font-bold focus-visible:ring-blue-500"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="quota-proficient" className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Profic.</label>
+                <Input
+                  id="quota-proficient"
+                  type="number"
+                  value={quotas.proficientCount}
+                  onChange={(e) => setQuotas({ ...quotas, proficientCount: Number(e.target.value) })}
+                  className="h-9 border-purple-200 px-2 font-bold focus-visible:ring-purple-500"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </div>
+      </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {words.map((word) => {
+      {!allSynced && !hasPending && (
+        <Button className="h-11 w-full text-sm font-bold shadow-sm" onClick={handleGenerate} disabled={generateQuery.isFetching}>
+          {generateQuery.isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+          {words.length > 0 ? "Regenerate Words" : "Generate Words"}
+        </Button>
+      )}
+
+      {allSynced ? (
+        <Button
+          className="h-11 w-full border border-emerald-500/30 bg-emerald-500/15 text-sm font-bold text-emerald-700 shadow-sm hover:bg-emerald-500/25 dark:text-emerald-300"
+          onClick={handleGenerate}
+        >
+          <CheckCircle2 className="mr-2 h-4 w-4" />
+          Everything Synced
+        </Button>
+      ) : hasPending && (
+        <Button className="h-11 w-full bg-blue-600 text-sm font-bold shadow-sm hover:bg-blue-700" onClick={handleBatchSubmit} disabled={submitBatchReviewMutation.isPending}>
+          {submitBatchReviewMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Sync Progress ({pendingWordCount} words)
+        </Button>
+      )}
+
+      {selectionStats && (
+        <div className="grid grid-cols-4 gap-2">
+          {selectionStatItems.map((item) => (
+            <div key={item.label} className={`rounded-md border p-2 ${item.className}`}>
+              <div className="text-[9px] font-black uppercase tracking-wider opacity-75">{item.label}</div>
+              <div className="flex items-end gap-1">
+                <span className="text-lg font-black leading-none">{item.value}</span>
+                <span className="text-[9px] font-bold opacity-60">/ {item.requested}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const wordListPanel = (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3 px-1">
+        <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">
+          Selected Words ({ratedWordCount}/{words.length} rated)
+        </h3>
+        {words.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 gap-2 px-3 text-xs font-bold"
+            onClick={handleRegenerateWords}
+            disabled={generateQuery.isFetching || generateStoryMutation.isPending}
+          >
+            {generateQuery.isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+            Redraw
+          </Button>
+        )}
+      </div>
+
+      {selectedWordGroups.length > 0 ? (
+        <div className="space-y-3">
+          {selectedWordGroups.map((group) => (
+            <div key={group.level} className="space-y-2">
+              <div className={`w-fit rounded border px-2 py-0.5 text-[10px] font-black uppercase tracking-widest ${cefrPillClass(group.level)}`}>
+                {group.level}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {group.words.map((word) => {
+                  const rating = pendingRatings[word.id] ?? syncedRatings[word.id];
                   const isSynced = syncedIds.has(word.id);
-                  const pendingRating = pendingRatings[word.id];
-
                   return (
-                    <Card
+                    <button
                       key={word.id}
-                      id={`word-card-${word.id}`}
-                      className={`hover:shadow-md transition-all duration-200 border-l-4 border-r border-t border-b ${word.cefr.startsWith("A") ? "border-l-green-500" :
-                        word.cefr.startsWith("B") ? "border-l-blue-500" :
-                          "border-l-purple-500"
-                        } ${isSynced ? "opacity-50 grayscale bg-muted/30" : pendingRating !== undefined ? "bg-primary/5 border-primary/20 shadow-sm" : "bg-card shadow-sm border-muted/50"}`}>
-                      <CardContent className="p-4 flex flex-col gap-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex flex-col">
-                            <span className={`text-xl font-bold ${cefrColor(word.cefr)} tracking-tight`}>
-                              {word.text}
-                            </span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-secondary/50 text-secondary-foreground w-fit mt-1">
-                              {word.cefr}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors" onClick={() => playTTS(word.text)}>
-                              <Volume2 className="h-5 w-5" />
-                            </Button>
-                            {isSynced && <CheckCircle2 className="h-6 w-6 text-green-500" />}
-                            {!isSynced && pendingRating !== undefined && (
-                              <div className="flex items-center gap-2">
-                                <div className="text-[10px] font-black uppercase px-2 py-1 bg-primary text-primary-foreground rounded">
-                                  {ratingLabels[pendingRating]}
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 rounded-full text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:text-orange-400 dark:hover:bg-orange-500/10 dark:hover:text-orange-300"
-                                  onClick={() => handleResetRating(word.id)}
-                                  title="Reset Rating"
-                                >
-                                  <RotateCcw className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid min-h-8 grid-cols-4 gap-1.5 mt-2">
-                          {!isSynced && pendingRating === undefined && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 border-red-200 bg-red-50 px-1 text-[11px] font-bold text-red-700 transition-colors hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20 dark:hover:text-red-200"
-                                onClick={() => handleReview(word.id, Rating.Again)}
-                              >
-                                Again
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 border-orange-200 bg-orange-50 px-1 text-[11px] font-bold text-orange-700 transition-colors hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/20 dark:hover:text-orange-200"
-                                onClick={() => handleReview(word.id, Rating.Hard)}
-                              >
-                                Hard
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 border-green-200 bg-green-50 px-1 text-[11px] font-bold text-green-700 transition-colors hover:bg-green-100 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-300 dark:hover:bg-green-500/20 dark:hover:text-green-200"
-                                onClick={() => handleReview(word.id, Rating.Good)}
-                              >
-                                Good
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 border-blue-200 bg-blue-50 px-1 text-[11px] font-bold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 dark:hover:text-blue-200"
-                                onClick={() => handleReview(word.id, Rating.Easy)}
-                              >
-                                Easy
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
+                      type="button"
+                      className={`rounded border px-2.5 py-1 text-sm font-bold transition-colors ${rating !== undefined ? ratingPillClass(rating) : cefrPillClass(word.cefr)} ${isSynced ? "opacity-60" : ""}`}
+                      onClick={() => {
+                        if (studyMode !== "single" || rating !== undefined) return;
+                        setActiveSingleWordId(word.id);
+                        generateStoryForWords([word], "single");
+                      }}
+                    >
+                      {word.text}
+                    </button>
                   );
                 })}
               </div>
             </div>
-          ) : (
-            <Card className="h-full bg-muted/30 border-dashed flex flex-col items-center justify-center p-12 text-center">
-              <div className="max-w-xs space-y-4">
-                <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                  <Loader2 className="h-8 w-8 text-muted-foreground opacity-50" />
-                </div>
-                <p className="text-lg font-semibold text-muted-foreground">No words loaded</p>
-                <p className="text-sm text-muted-foreground/70">
-                  Choose your difficulty quotas above and generate a word list to start.
-                </p>
-              </div>
-            </Card>
-          )}
+          ))}
         </div>
+      ) : (
+        <div className="rounded-lg border border-dashed bg-muted/20 p-6 text-center text-sm font-medium text-muted-foreground">
+          Generate words to start.
+        </div>
+      )}
+    </div>
+  );
+
+  const storyControlsPanel = (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <Button type="button" variant={studyMode === "multiple" ? "default" : "outline"} className="h-9 text-xs font-bold sm:text-sm" onClick={() => handleModeChange("multiple")} disabled={generateStoryMutation.isPending}>
+          multiply mode
+        </Button>
+        <Button type="button" variant={studyMode === "single" ? "default" : "outline"} className="h-9 text-xs font-bold sm:text-sm" onClick={() => handleModeChange("single")} disabled={generateStoryMutation.isPending}>
+          single mode
+        </Button>
       </div>
 
-      {/* Right Column: AI Story & Explanation */}
-      <div className="flex flex-col h-full lg:w-1/2 min-w-0 relative">
+      <div className="grid grid-cols-1 gap-2">
+        <Select value={difficulty} onValueChange={(val) => {
+          if (typeof val === "string" && isCefrLevel(val)) setDifficulty(val);
+        }}>
+          <SelectTrigger className="h-9 w-full border-muted-foreground/20 bg-background shadow-sm">
+            <SelectValue placeholder="Level" />
+          </SelectTrigger>
+          <SelectContent>
+            {CEFR_LEVELS.map((level) => (
+              <SelectItem key={level} value={level}>{level}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={theme} onValueChange={(val) => val && setTheme(val)}>
+          <SelectTrigger className="h-9 w-full border-muted-foreground/20 bg-background shadow-sm">
+            <SelectValue placeholder="Theme" />
+          </SelectTrigger>
+          <SelectContent>
+            {["General", "Work & Career", "Daily Life", "Travel", "Science & Tech", "Mystery & Story"].map((t) => (
+              <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button onClick={handleGenerateStory} disabled={generateStoryMutation.isPending || unratedWords.length === 0} className="h-9 min-w-0 whitespace-nowrap px-4 font-bold shadow-sm">
+          {generateStoryMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpen className="mr-2 h-4 w-4" />}
+          {studyMode === "single" ? "Regenerate Single" : `Regenerate Story (${unratedWords.length})`}
+        </Button>
+      </div>
+
+      {studyMode === "single" && (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1">
+          <Select value={activeSingleWord?.id ? String(activeSingleWord.id) : ""} onValueChange={handleSelectSingleWord} disabled={unratedWords.length === 0 || generateStoryMutation.isPending}>
+            <SelectTrigger className="h-9 w-full border-muted-foreground/20 bg-background shadow-sm">
+              <span className="flex flex-1 truncate text-left">
+                {activeSingleWord?.text ?? "Choose an unrated word"}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              {unratedWords.map((word) => (
+                <SelectItem key={word.id} value={String(word.id)}>{word.text}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button type="button" variant="outline" className="h-9 gap-2 px-4 text-xs font-bold" onClick={handleRandomSingleWord} disabled={unratedWords.length === 0 || generateStoryMutation.isPending}>
+            <Shuffle className="h-4 w-4" />
+            Random
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  const storyReader = (
+    <div className="space-y-6">
+      {generateStoryMutation.isPending ? (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-muted bg-muted/10 py-24 text-muted-foreground">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-sm font-bold">Generating story...</p>
+        </div>
+      ) : story ? (
+        <div
+          ref={storyRef}
+          className="prose prose-slate relative max-w-none cursor-text select-text overflow-visible rounded-lg border border-muted bg-background p-4 shadow-sm selection:bg-blue-200 selection:text-slate-950 dark:selection:bg-blue-400/70 dark:selection:text-white sm:p-6"
+          onClick={(e) => {
+            handleStoryClick(e);
+          }}
+          onMouseUp={handleStoryMouseUp}
+        >
+          <div
+            dangerouslySetInnerHTML={{ __html: processedStory() }}
+            className="[&_u]:cursor-help [&_u]:decoration-dashed [&_u]:underline-offset-4 font-sans text-base leading-relaxed text-foreground md:text-lg"
+          />
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted bg-muted/5 py-24 text-muted-foreground">
+          <BookOpen className="mb-4 h-12 w-12 opacity-20" />
+          <p className="text-base font-semibold">Your story will appear here</p>
+        </div>
+      )}
+    </div>
+  );
+
+  const explanationPanel = (
+    <div className="overflow-hidden rounded-lg border border-primary/20 bg-primary/5 shadow-sm animate-in fade-in slide-in-from-top-2 duration-300">
+      <div className="flex items-center justify-between bg-primary/10 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <h3 className="text-base font-bold text-primary">Contextual Explanation</h3>
+        </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => {
+          setExplanation(null);
+          setExplanationWord(null);
+        }}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="p-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Explaining:</span>
+            <span className="rounded-md border bg-background px-3 py-1 text-base font-bold text-foreground shadow-sm">
+              {explanationWord}
+            </span>
+          </div>
+          <div className="relative min-h-[96px] rounded-lg border border-primary/10 bg-background p-4 shadow-inner">
+            {explainMutation.isPending ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-4">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="text-xs font-medium text-muted-foreground animate-pulse">Consulting AI Linguist...</p>
+              </div>
+            ) : (
+              <p className="text-base font-medium leading-relaxed text-foreground">
+                {explanation}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`relative flex w-full min-h-0 flex-col gap-3 overflow-visible lg:grid lg:h-full lg:grid-cols-[320px_minmax(0,1fr)_340px] lg:items-stretch lg:gap-5 lg:overflow-hidden ${showExplanationPanel ? "pb-[48dvh] lg:pb-0" : ""}`} onClick={() => {
+      setFloatingMenu(null);
+      setSelectionMenu(null);
+    }}>
+      <div className="space-y-3 lg:hidden">
+        <button
+          type="button"
+          className="flex h-11 w-full items-center justify-between rounded-lg border bg-card px-3 text-left text-sm font-bold shadow-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMobileWordsOpen((value) => !value);
+          }}
+        >
+          <span>Words & Selection ({ratedWordCount}/{words.length})</span>
+          {isMobileWordsOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </button>
+        {isMobileWordsOpen && (
+          <div className="space-y-4 rounded-lg border bg-background p-3 shadow-sm">
+            {selectionPanel}
+            {wordListPanel}
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="flex h-11 w-full items-center justify-between rounded-lg border bg-card px-3 text-left text-sm font-bold shadow-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsMobileStoryConfigOpen((value) => !value);
+          }}
+        >
+          <span>Story Config</span>
+          {isMobileStoryConfigOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </button>
+        {isMobileStoryConfigOpen && (
+          <div className="rounded-lg border bg-background p-3 shadow-sm">
+            {storyControlsPanel}
+          </div>
+        )}
+      </div>
+
+      <aside className="hidden min-h-0 flex-col gap-4 overflow-y-auto border-r border-border/70 pr-4 lg:flex scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+        {selectionPanel}
+        {wordListPanel}
+      </aside>
+
+      <main className="min-h-0 overflow-visible lg:overflow-y-auto lg:pr-2 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+        {storyReader}
+      </main>
+
+      <aside className="hidden min-h-0 flex-col gap-4 overflow-y-auto border-l border-border/70 pl-4 lg:flex scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+        {showExplanationPanel && explanationPanel}
+        <div className="rounded-lg border bg-card p-3 shadow-sm">
+          {storyControlsPanel}
+        </div>
+      </aside>
+
+      {showExplanationPanel && (
+        <div className="fixed inset-x-0 bottom-0 z-[90] max-h-[52dvh] overflow-y-auto rounded-t-2xl border border-primary/20 bg-background p-3 shadow-2xl lg:hidden" onClick={(e) => e.stopPropagation()}>
+          {explanationPanel}
+        </div>
+      )}
+
+      <div className="contents">
         {/* Floating Menus (fixed to screen, context-aware) */}
         {floatingMenu && (
           <div 
@@ -834,107 +1135,6 @@ export function WordSelection() {
             </Button>
           </div>
         )}
-
-        {/* Story Controls - Pinned at top of column */}
-        <div className="flex-none mb-4">
-          <Card className="overflow-visible border border-border bg-card/80 shadow-sm">
-            <CardContent className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-[1fr_1fr_auto]">
-                <Select value={difficulty} onValueChange={(val) => {
-                  if (typeof val === "string" && isCefrLevel(val)) setDifficulty(val);
-                }}>
-                  <SelectTrigger className="h-9 w-full border-muted-foreground/20 bg-background shadow-sm">
-                    <SelectValue placeholder="Level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CEFR_LEVELS.map((level) => (
-                      <SelectItem key={level} value={level}>{level}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={theme} onValueChange={(val) => val && setTheme(val)}>
-                  <SelectTrigger className="h-9 w-full border-muted-foreground/20 bg-background shadow-sm">
-                    <SelectValue placeholder="Theme" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["General", "Work & Career", "Daily Life", "Travel", "Science & Tech", "Mystery & Story"].map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              <Button
-                onClick={handleGenerateStory}
-                disabled={generateStoryMutation.isPending || unratedWords.length === 0}
-                className="h-9 min-w-[168px] whitespace-nowrap px-4 font-bold shadow-sm"
-              >
-                {generateStoryMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpen className="mr-2 h-4 w-4" />}
-                Generate Story ({unratedWords.length})
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Story Content & Explanation - Scrollable area */}
-        <div className="flex-1 overflow-y-auto pr-4 pb-8 space-y-6 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
-          {story ? (
-            <div 
-              ref={storyRef}
-              className="relative cursor-text select-text overflow-visible rounded-lg border border-muted bg-background p-6 shadow-sm selection:bg-blue-200 selection:text-slate-950 dark:selection:bg-blue-400/70 dark:selection:text-white prose prose-slate max-w-none"
-              onClick={(e) => {
-                handleStoryClick(e);
-              }}
-              onMouseUp={handleStoryMouseUp}
-            >
-              <div
-                dangerouslySetInnerHTML={{ __html: processedStory() }}
-                className="[&_mark]:cursor-pointer [&_mark]:rounded [&_mark]:border-b-2 [&_mark]:border-orange-300/40 [&_mark]:bg-orange-100/60 [&_mark]:px-1 [&_mark]:py-0.5 [&_mark]:font-bold [&_mark]:text-orange-900 [&_mark]:transition-all [&_mark]:duration-300 hover:[&_mark]:bg-orange-200/70 dark:[&_mark]:bg-orange-400/20 dark:[&_mark]:text-orange-100 dark:hover:[&_mark]:bg-orange-400/30 [&_mark[data-rated='true']]:cursor-default [&_mark[data-rated='true']]:opacity-40 [&_mark[data-rated='true']]:grayscale [&_u]:cursor-help [&_u]:decoration-orange-300/50 [&_u]:decoration-dashed [&_u]:underline-offset-4 font-sans text-base leading-relaxed text-foreground md:text-lg"
-              />
-            </div>
-          ) : !generateStoryMutation.isPending && (
-            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground bg-muted/5 rounded-lg border-2 border-dashed border-muted">
-              <BookOpen className="h-12 w-12 opacity-20 mb-4" />
-              <p className="text-base font-semibold">Your story will appear here</p>
-            </div>
-          )}
-
-          {showExplanationPanel && (
-            <Card id="explanation-section" className="shadow-lg border-2 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden">
-              <CardHeader className="bg-primary/10 py-3 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-base font-bold text-primary">Contextual Explanation</CardTitle>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => {
-                  setExplanation(null);
-                  setExplanationWord(null);
-                }}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </CardHeader>
-              <CardContent className="p-5">
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black uppercase text-muted-foreground tracking-widest">Explaining:</span>
-                    <span className="text-lg font-bold text-foreground bg-background px-3 py-1 rounded-md border shadow-sm">
-                      {explanationWord}
-                    </span>
-                  </div>
-                  <div className="relative min-h-[60px] bg-background p-4 rounded-lg border-2 border-primary/10 shadow-inner">
-                    {explainMutation.isPending ? (
-                      <div className="flex flex-col items-center justify-center py-4 gap-2">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                        <p className="text-xs font-medium text-muted-foreground animate-pulse">Consulting AI Linguist...</p>
-                      </div>
-                    ) : (
-                      <p className="text-base leading-relaxed text-foreground font-medium italic">
-                        {explanation}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
       </div>
     </div>
   );

@@ -18,7 +18,7 @@ const deepseek = env.DEEPSEEK_API_KEY
   : null;
 
 export type GeminiModel = "gemini-3.1-flash-lite";
-export type DeepSeekModel = "deepseek-v4-pro";
+export type DeepSeekModel = "deepseek-v4-flash";
 export type ProviderModel = GeminiModel | DeepSeekModel;
 export type AIProvider = "gemini" | "deepseek";
 
@@ -64,7 +64,7 @@ const callDeepSeekProvider = async (prompt: string, options: ProviderOptions) =>
   if (!deepseek) throw new Error("DeepSeek client is not configured");
 
   const completion = (await deepseek.chat.completions.create({
-    model: options.model === "deepseek-v4-pro" ? options.model : "deepseek-v4-pro",
+    model: options.model === "deepseek-v4-flash" ? options.model : "deepseek-v4-flash",
     messages: [
       ...(options.systemInstruction
         ? [{ role: "system" as const, content: options.systemInstruction }]
@@ -99,9 +99,9 @@ export async function callProvider(prompt: string, options: ProviderOptions = {}
   const start = Date.now();
   const model =
     env.PROVIDER === "deepseek"
-      ? options.model === "deepseek-v4-pro"
+      ? options.model === "deepseek-v4-flash"
         ? options.model
-        : "deepseek-v4-pro"
+        : "deepseek-v4-flash"
       : options.model === "gemini-3.1-flash-lite"
         ? options.model
         : "gemini-3.1-flash-lite";
