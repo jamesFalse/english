@@ -24,9 +24,9 @@ const normalizeTargetWord = (word: string) => word.trim().toLowerCase();
 
 const findMissingMarkedWords = (story: string, words: string[]) => {
   const markedWords = new Set(
-    Array.from(story.matchAll(/<mark\s+[^>]*data-word=["']([^"']+)["'][^>]*>/gi)).map((match) =>
-      normalizeTargetWord(match[1] ?? ""),
-    ),
+    Array.from(
+      story.matchAll(/<mark\s+[^>]*data-word=["']([^"']+)["'][^>]*>/gi),
+    ).map((match) => normalizeTargetWord(match[1] ?? "")),
   );
 
   return words.filter((word) => !markedWords.has(normalizeTargetWord(word)));
@@ -52,7 +52,8 @@ const toGrade = (rating: Rating): Grade => {
   return rating;
 };
 
-const shuffleWords = <T>(words: T[]) => [...words].sort(() => Math.random() - 0.5);
+const shuffleWords = <T>(words: T[]) =>
+  [...words].sort(() => Math.random() - 0.5);
 
 const pickAlphabeticallyDiverseWords = (candidates: Word[], count: number) => {
   if (count <= 0) return [];
@@ -73,7 +74,11 @@ const pickAlphabeticallyDiverseWords = (candidates: Word[], count: number) => {
 
   while (selected.length < count && available.size > 0) {
     const scored = Array.from(available).map((index) => {
-      const minDistance = Math.min(...selectedIndexes.map((selectedIndex) => Math.abs(index - selectedIndex)));
+      const minDistance = Math.min(
+        ...selectedIndexes.map((selectedIndex) =>
+          Math.abs(index - selectedIndex),
+        ),
+      );
       return { index, minDistance };
     });
 
@@ -83,7 +88,8 @@ const pickAlphabeticallyDiverseWords = (candidates: Word[], count: number) => {
     const bestIndexes = scored
       .filter((item) => item.minDistance === bestDistance)
       .map((item) => item.index);
-    const nextIndex = bestIndexes[Math.floor(Math.random() * bestIndexes.length)];
+    const nextIndex =
+      bestIndexes[Math.floor(Math.random() * bestIndexes.length)];
 
     if (nextIndex === undefined) break;
 
@@ -98,29 +104,58 @@ const pickAlphabeticallyDiverseWords = (candidates: Word[], count: number) => {
 export const wordRouter = createTRPCRouter({
   generateSelection: publicProcedure
     .input(
-      z.object({
-        reviewCount: z.number().min(0).max(100),
-        basicCount: z.number().min(0).max(100),
-        independentCount: z.number().min(0).max(100),
-        proficientCount: z.number().min(0).max(100),
-      })
+      z
+        .object({
+          reviewACount: z.number().int().min(0).max(100),
+          reviewBCount: z.number().int().min(0).max(100),
+          reviewCCount: z.number().int().min(0).max(100),
+        basicCount: z.number().int().min(0).max(100),
+        independentCount: z.number().int().min(0).max(100),
+        proficientCount: z.number().int().min(0).max(100),
+        })
+        .refine(
+          ({
+            reviewACount,
+            reviewBCount,
+            reviewCCount,
+            basicCount,
+            independentCount,
+            proficientCount,
+          }) =>
+            reviewACount +
+              reviewBCount +
+              reviewCCount +
+              basicCount +
+              independentCount +
+              proficientCount <=
+            100,
+          { message: "The total word count cannot exceed 100." },
+        ),
     )
     .query(async ({ ctx, input }) => {
-      const { reviewCount, basicCount, independentCount, proficientCount } = input;
+      const {
+        reviewACount,
+        reviewBCount,
+        reviewCCount,
+        basicCount,
+        independentCount,
+        proficientCount,
+      } = input;
       const now = new Date();
 
-      // 1. Fetch Due Review Words (Any CEFR)
-      const fetchReviewWords = async () => {
-        if (reviewCount <= 0) return [];
+      // 1. Fetch due review words independently for each CEFR band.
+      const fetchReviewWords = async (cefrs: string[], count: number) => {
+        if (count <= 0) return [];
         const dueWords = await ctx.db.word.findMany({
           where: {
             due: { lte: now },
             state: { gt: 0 },
+            cefr: { in: cefrs },
           },
           orderBy: { due: "asc" },
-          take: reviewCount * 3, // Oversample for shuffle
+          take: count * 3,
         });
-        return dueWords.sort(() => Math.random() - 0.5).slice(0, reviewCount);
+        return shuffleWords(dueWords).slice(0, count);
       };
 
       // 2. Helper to fetch new words with diversity logic
@@ -139,19 +174,37 @@ export const wordRouter = createTRPCRouter({
       };
 
       // 3. Parallel fetching
-      const [reviewWords, newBasic, newIndependent, newProficient] = await Promise.all([
-        fetchReviewWords(),
+      const [
+        reviewA,
+        reviewB,
+        reviewC,
+        newBasic,
+        newIndependent,
+        newProficient,
+      ] = await Promise.all([
+        fetchReviewWords(["A1", "A2"], reviewACount),
+        fetchReviewWords(["B1", "B2"], reviewBCount),
+        fetchReviewWords(["C1", "C2"], reviewCCount),
         getDiverseNewWords(["A1", "A2"], basicCount),
         getDiverseNewWords(["B1", "B2"], independentCount),
         getDiverseNewWords(["C1", "C2"], proficientCount),
       ]);
 
       // 4. Combine and final shuffle
-      const selection = [...reviewWords, ...newBasic, ...newIndependent, ...newProficient];
+      const reviewWords = [...reviewA, ...reviewB, ...reviewC];
+      const selection = [
+        ...reviewWords,
+        ...newBasic,
+        ...newIndependent,
+        ...newProficient,
+      ];
       return {
         words: shuffleWords(selection),
         stats: {
           review: reviewWords.length,
+          reviewA: reviewA.length,
+          reviewB: reviewB.length,
+          reviewC: reviewC.length,
           basic: newBasic.length,
           independent: newIndependent.length,
           proficient: newProficient.length,
@@ -167,19 +220,21 @@ export const wordRouter = createTRPCRouter({
         difficulty: z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]),
         theme: z.string().max(80).optional(),
         mode: z.enum(["multiple", "single"]).default("multiple"),
-      })
+      }),
     )
     .mutation(async ({ input }) => {
       const { words, difficulty, theme, mode } = input;
       const wordCount = words.length;
-      const targetLength = mode === "single" ? 240 : Math.max(80, wordCount * 15);
+      const targetLength =
+        mode === "single" ? 240 : Math.max(80, wordCount * 15);
       const start = Date.now();
 
-      const themeContext = theme && theme !== "General" 
-        ? `The story should be set in or related to: **${theme}**. 
+      const themeContext =
+        theme && theme !== "General"
+          ? `The story should be set in or related to: **${theme}**.
            If a word doesn't naturally fit this theme, use a creative metaphor or a brief sub-plot to integrate it smoothly. 
-           Priority 1 is natural narrative flow.` 
-        : "The story can be about any engaging topic.";
+           Priority 1 is natural narrative flow.`
+          : "The story can be about any engaging topic.";
 
       const storyShape =
         mode === "single"
@@ -211,7 +266,7 @@ export const wordRouter = createTRPCRouter({
       `;
 
       let story = await callProvider(buildPrompt(), {
-        systemInstruction: STORY_SYSTEM_PROMPT 
+        systemInstruction: STORY_SYSTEM_PROMPT,
       });
       let missingWords = findMissingMarkedWords(story, words);
 
@@ -224,7 +279,9 @@ export const wordRouter = createTRPCRouter({
       }
 
       if (missingWords.length > 0) {
-        throw new Error(`AI story missed required target words: ${missingWords.join(", ")}`);
+        throw new Error(
+          `AI story missed required target words: ${missingWords.join(", ")}`,
+        );
       }
 
       if (process.env.NODE_ENV === "development") {
@@ -241,7 +298,7 @@ export const wordRouter = createTRPCRouter({
       z.object({
         wordId: z.number(),
         rating: reviewRatingSchema,
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       const { wordId, rating } = input;
@@ -284,65 +341,68 @@ export const wordRouter = createTRPCRouter({
         z.object({
           wordId: z.number(),
           rating: reviewRatingSchema,
-        })
-      )
+        }),
+      ),
     )
     .mutation(async ({ ctx, input }) => {
       const f = fsrs();
       const now = new Date();
       const wordIds = input.map((i) => i.wordId);
 
-      return ctx.db.$transaction(async (tx) => {
-        // 1. 一次性获取所有相关的单词数据，减少数据库往返
-        const words = await tx.word.findMany({
-          where: { id: { in: wordIds } },
-        });
+      return ctx.db.$transaction(
+        async (tx) => {
+          // 1. 一次性获取所有相关的单词数据，减少数据库往返
+          const words = await tx.word.findMany({
+            where: { id: { in: wordIds } },
+          });
 
-        const wordMap = new Map(words.map((w) => [w.id, w]));
-        const updatePromises = [];
+          const wordMap = new Map(words.map((w) => [w.id, w]));
+          const updatePromises = [];
 
-        // 2. 循环处理评分并准备更新
-        for (const { wordId, rating } of input) {
-          const word = wordMap.get(wordId);
-          if (!word) continue;
+          // 2. 循环处理评分并准备更新
+          for (const { wordId, rating } of input) {
+            const word = wordMap.get(wordId);
+            if (!word) continue;
 
-          const card = createEmptyCard();
-          card.due = word.due ?? now;
-          card.stability = word.stability;
-          card.difficulty = word.difficulty;
-          card.scheduled_days = word.scheduled_days;
-          card.reps = word.reps;
-          card.lapses = word.lapses;
-          card.state = word.state;
-          card.last_review = word.last_review ?? undefined;
+            const card = createEmptyCard();
+            card.due = word.due ?? now;
+            card.stability = word.stability;
+            card.difficulty = word.difficulty;
+            card.scheduled_days = word.scheduled_days;
+            card.reps = word.reps;
+            card.lapses = word.lapses;
+            card.state = word.state;
+            card.last_review = word.last_review ?? undefined;
 
-          const schedulingCards = f.repeat(card, now);
-          const { card: updatedCard } = schedulingCards[toGrade(rating)];
+            const schedulingCards = f.repeat(card, now);
+            const { card: updatedCard } = schedulingCards[toGrade(rating)];
 
-          // 将更新操作加入队列
-          updatePromises.push(
-            tx.word.update({
-              where: { id: wordId },
-              data: {
-                due: updatedCard.due,
-                stability: updatedCard.stability,
-                difficulty: updatedCard.difficulty,
-                elapsed_days: updatedCard.elapsed_days,
-                scheduled_days: updatedCard.scheduled_days,
-                reps: updatedCard.reps,
-                lapses: updatedCard.lapses,
-                state: updatedCard.state,
-                last_review: updatedCard.last_review,
-              },
-            })
-          );
-        }
+            // 将更新操作加入队列
+            updatePromises.push(
+              tx.word.update({
+                where: { id: wordId },
+                data: {
+                  due: updatedCard.due,
+                  stability: updatedCard.stability,
+                  difficulty: updatedCard.difficulty,
+                  elapsed_days: updatedCard.elapsed_days,
+                  scheduled_days: updatedCard.scheduled_days,
+                  reps: updatedCard.reps,
+                  lapses: updatedCard.lapses,
+                  state: updatedCard.state,
+                  last_review: updatedCard.last_review,
+                },
+              }),
+            );
+          }
 
-        // 3. 并行执行所有更新
-        return Promise.all(updatePromises);
-      }, {
-        timeout: 30000, // 将事务超时时间增加到 30 秒，防止默认的 5 秒限制
-      });
+          // 3. 并行执行所有更新
+          return Promise.all(updatePromises);
+        },
+        {
+          timeout: 30000, // 将事务超时时间增加到 30 秒，防止默认的 5 秒限制
+        },
+      );
     }),
 
   getNewWords: publicProcedure
@@ -352,22 +412,24 @@ export const wordRouter = createTRPCRouter({
         search: z.string().optional(),
         page: z.number().default(1),
         pageSize: z.number().default(100),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const { cefr, search, page, pageSize } = input;
       const skip = (page - 1) * pageSize;
-      
+
       const where: Prisma.WordWhereInput = {
         state: 0,
         ...(cefr && cefr.length > 0 ? { cefr: { in: cefr } } : {}),
-        ...(search ? { text: { contains: search, mode: Prisma.QueryMode.insensitive } } : {}),
+        ...(search
+          ? { text: { contains: search, mode: Prisma.QueryMode.insensitive } }
+          : {}),
       };
 
       const [items, totalCount] = await Promise.all([
         ctx.db.word.findMany({
           where,
-          orderBy: { text: 'asc' },
+          orderBy: { text: "asc" },
           skip,
           take: pageSize,
         }),
@@ -413,7 +475,7 @@ export const wordRouter = createTRPCRouter({
       z.object({
         word: z.string().min(1),
         story: z.string().min(1),
-      })
+      }),
     )
     .mutation(async ({ input }) => {
       const { word, story } = input;
@@ -436,7 +498,8 @@ export const wordRouter = createTRPCRouter({
       `;
 
       return callProvider(prompt, {
-        systemInstruction: "You are a helpful and professional English language tutor specializing in contextual definitions."
+        systemInstruction:
+          "You are a helpful and professional English language tutor specializing in contextual definitions.",
       });
     }),
 });
